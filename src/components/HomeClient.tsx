@@ -23,6 +23,8 @@ export default function HomeClient() {
   const [browseCategory, setBrowseCategory] = useState<
     'all' | ElectronicsComponent['category']
   >('all')
+  // Key used to reset the ImageUpload component's internal state
+  const [uploadKey, setUploadKey] = useState(0)
 
   const filteredComponents = useMemo(() => {
     const normalizedQuery = browseQuery.trim().toLowerCase()
@@ -43,6 +45,7 @@ export default function HomeClient() {
   const handleImageSelected = useCallback(
     async (base64: string) => {
       setView('analyzing')
+      setShowBrowse(false)
       clearError()
 
       const result = await identify(base64)
@@ -64,6 +67,7 @@ export default function HomeClient() {
     setIdentifiedComponent(null)
     setConfidence(0)
     clearError()
+    setUploadKey((k) => k + 1)
   }, [clearError])
 
   return (
@@ -86,6 +90,7 @@ export default function HomeClient() {
             </div>
 
             <ImageUpload
+              key={uploadKey}
               onImageSelected={handleImageSelected}
               isAnalyzing={isAnalyzing}
             />
@@ -149,6 +154,7 @@ export default function HomeClient() {
                 onClick={() => {
                   setShowBrowse(true)
                   setView('home')
+                  setUploadKey((k) => k + 1)
                 }}
                 className="px-5 py-2.5 rounded-lg border border-black/20 dark:border-white/20 text-black dark:text-white text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
@@ -159,7 +165,7 @@ export default function HomeClient() {
         )}
 
         {/* Browse All Components Grid */}
-        {showBrowse && (
+        {showBrowse && view !== 'result' && (
           <section className="mt-8">
             <div className="mb-6 flex flex-col gap-4">
               <div className="flex items-center justify-between">
