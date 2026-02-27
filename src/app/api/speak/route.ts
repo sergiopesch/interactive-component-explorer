@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { HfInference } from '@huggingface/inference'
 
-const hf = new HfInference(process.env.HF_TOKEN)
+const MAX_TEXT_LENGTH = 1000
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.HF_TOKEN) {
+    const token = process.env.HF_TOKEN
+    if (!token) {
       return NextResponse.json(
         { error: 'HF_TOKEN not configured.' },
-        { status: 500 }
+        { status: 503 }
       )
     }
+
+    const hf = new HfInference(token)
 
     const { text } = await request.json()
     if (!text || typeof text !== 'string') {
@@ -21,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Limit text length to prevent abuse
-    const truncatedText = text.slice(0, 1000)
+    const truncatedText = text.slice(0, MAX_TEXT_LENGTH)
 
     const audioBlob = await hf.textToSpeech({
       model: 'facebook/mms-tts-eng',

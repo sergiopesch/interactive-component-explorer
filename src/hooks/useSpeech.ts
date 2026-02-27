@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+const TTS_TIMEOUT_MS = 15000
 
 export function useSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -21,6 +23,8 @@ export function useSpeech() {
     }
   }, [])
 
+  useEffect(() => cleanupAudio, [cleanupAudio])
+
   const fallbackToWebSpeech = useCallback((text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       setIsSpeaking(false)
@@ -40,12 +44,16 @@ export function useSpeech() {
       cleanupAudio()
       setIsSpeaking(true)
 
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), TTS_TIMEOUT_MS)
+
       try {
         // Try HF TTS API first
         const res = await fetch('/api/speak', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
+          signal: controller.signal,
         })
 
         if (!res.ok) throw new Error('TTS API failed')
@@ -71,6 +79,8 @@ export function useSpeech() {
       } catch {
         // Fallback to Web Speech API
         fallbackToWebSpeech(text)
+      } finally {
+        clearTimeout(timeout)
       }
     },
     [cleanupAudio, fallbackToWebSpeech]
