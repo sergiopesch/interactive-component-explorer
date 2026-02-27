@@ -15,13 +15,16 @@ function createPipelinePromise(
 ): Promise<(image: string, labels: string[]) => Promise<ClassifyResult[]>> {
   return (async () => {
     const { pipeline, env } = await import('@huggingface/transformers')
-    // Models are fetched from Hugging Face Hub and cached in the browser
-    env.allowLocalModels = false
+    // Load models from the app's own static files (public/models/)
+    env.localModelPath = '/models/'
+    env.allowLocalModels = true
+    env.allowRemoteModels = false
 
     const classifier = await pipeline(
       'zero-shot-image-classification',
       'Xenova/clip-vit-base-patch16',
       {
+        dtype: 'q8',
         progress_callback: (p: { status?: string; progress?: number }) => {
           if (p.status === 'progress' && typeof p.progress === 'number') {
             onProgress?.(Math.round(p.progress))

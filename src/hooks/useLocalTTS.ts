@@ -10,9 +10,13 @@ function createTTSPromise(
 ): Promise<(text: string) => Promise<{ audio: Float32Array; sampling_rate: number }>> {
   return (async () => {
     const { pipeline, env } = await import('@huggingface/transformers')
-    env.allowLocalModels = false
+    // Load models from the app's own static files (public/models/)
+    env.localModelPath = '/models/'
+    env.allowLocalModels = true
+    env.allowRemoteModels = false
 
     const synthesizer = await pipeline('text-to-speech', 'Xenova/mms-tts-eng', {
+      dtype: 'q8',
       progress_callback: (p: { status?: string; progress?: number }) => {
         if (p.status === 'progress' && typeof p.progress === 'number') {
           onProgress?.(Math.round(p.progress))
