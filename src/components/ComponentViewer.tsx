@@ -112,9 +112,9 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
     setRetryKey((k) => k + 1)
   }, [])
 
-  // Lazy-render the Canvas only when visible in the viewport.
-  // Browsers limit WebGL contexts to ~8-16; rendering 17+ canvases
-  // simultaneously when browsing all components would crash.
+  // Bidirectional visibility: mount Canvas when near viewport, unmount when far away.
+  // Browsers limit WebGL contexts to ~8-16; this keeps only nearby canvases alive
+  // and frees contexts for cards that scroll out of view.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -126,12 +126,9 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true)
-          observer.disconnect()
-        }
+        setIsVisible(entry.isIntersecting)
       },
-      { rootMargin: '400px' }
+      { rootMargin: '300px' }
     )
 
     observer.observe(el)
@@ -173,7 +170,7 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
         </CanvasErrorBoundary>
       ) : (
         <div className="w-full h-64 flex items-center justify-center text-black/20 dark:text-white/20">
-          <p className="text-sm">Scroll to load 3D model</p>
+          <p className="text-sm">Loading 3D model...</p>
         </div>
       )}
     </div>

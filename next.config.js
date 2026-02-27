@@ -12,6 +12,13 @@ const nextConfig = {
       sharp$: false,
       'onnxruntime-node$': false,
     }
+
+    // Enable WebAssembly support for ONNX Runtime Web
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    }
+
     return config
   },
 }

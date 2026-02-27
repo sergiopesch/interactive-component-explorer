@@ -20,6 +20,20 @@ function createPipelinePromise(
     env.allowLocalModels = true
     env.allowRemoteModels = false
 
+    // Configure ONNX Runtime WASM backend:
+    // 1. Point to WASM files in public/ (copied from onnxruntime-web/dist/)
+    // 2. Use single thread to avoid SharedArrayBuffer requirement
+    //    (SharedArrayBuffer needs COOP/COEP headers that static exports can't set)
+    try {
+      if (env.backends?.onnx?.wasm) {
+        env.backends.onnx.wasm.wasmPaths = '/'
+        env.backends.onnx.wasm.numThreads = 1
+        env.backends.onnx.wasm.proxy = false
+      }
+    } catch {
+      // Transformers.js API may vary between versions
+    }
+
     const classifier = await pipeline(
       'zero-shot-image-classification',
       'Xenova/clip-vit-base-patch16',

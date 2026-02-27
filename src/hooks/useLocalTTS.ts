@@ -15,6 +15,17 @@ function createTTSPromise(
     env.allowLocalModels = true
     env.allowRemoteModels = false
 
+    // Configure ONNX Runtime WASM backend (same as classifier hook)
+    try {
+      if (env.backends?.onnx?.wasm) {
+        env.backends.onnx.wasm.wasmPaths = '/'
+        env.backends.onnx.wasm.numThreads = 1
+        env.backends.onnx.wasm.proxy = false
+      }
+    } catch {
+      // Transformers.js API may vary between versions
+    }
+
     const synthesizer = await pipeline('text-to-speech', 'Xenova/mms-tts-eng', {
       dtype: 'q8',
       progress_callback: (p: { status?: string; progress?: number }) => {

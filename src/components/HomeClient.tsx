@@ -231,7 +231,6 @@ export default function HomeClient() {
                   <ComponentCard
                     key={component.id}
                     component={component}
-                    defer3D
                   />
                 ))}
               </div>
