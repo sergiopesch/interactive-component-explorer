@@ -1,106 +1,69 @@
 'use client'
 
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-import { Suspense, Component, useRef, useState, useEffect, useCallback } from 'react'
-import type { ReactNode } from 'react'
-import ResistorModel from './models/ResistorModel'
-import LEDModel from './models/LEDModel'
-import ButtonModel from './models/ButtonModel'
-import SpeakerModel from './models/SpeakerModel'
-import CapacitorModel from './models/CapacitorModel'
-import PotentiometerModel from './models/PotentiometerModel'
-import DiodeModel from './models/DiodeModel'
-import TransistorModel from './models/TransistorModel'
-import GenericModel from './models/GenericModel'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 interface ComponentViewerProps {
   componentId: string
   powered: boolean
 }
 
-// Error boundary to catch Three.js / WebGL context errors gracefully
-interface ErrorBoundaryProps {
-  children: ReactNode
-  onRetry?: () => void
-}
+function createModel(componentId: string, powered: boolean) {
+  const group = new THREE.Group()
 
-interface ErrorBoundaryState {
-  hasError: boolean
-}
+  const metal = new THREE.MeshStandardMaterial({ color: '#c7c7c7', metalness: 0.8, roughness: 0.3 })
+  const dark = new THREE.MeshStandardMaterial({ color: '#2a2a2a', roughness: 0.7 })
+  const glass = new THREE.MeshStandardMaterial({
+    color: powered ? '#ff4040' : '#7a1e1e',
+    emissive: powered ? '#ff2a2a' : '#000000',
+    emissiveIntensity: powered ? 1.2 : 0,
+    transparent: true,
+    opacity: 0.9,
+  })
 
-class CanvasErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false }
-  }
+  if (componentId === 'resistor') {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.8, 24), new THREE.MeshStandardMaterial({ color: '#d7c0a3' }))
+    body.rotation.z = Math.PI / 2
+    group.add(body)
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
-    return { hasError: true }
-  }
+    ;[-0.4, 0.4].forEach((x) => {
+      const lead = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 12), metal)
+      lead.position.x = x
+      lead.rotation.z = Math.PI / 2
+      group.add(lead)
+    })
+  } else if (componentId === 'led' || componentId === 'rgb-led') {
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.5, 32), glass)
+    lens.position.y = 0.35
+    group.add(lens)
 
-  handleRetry = () => {
-    this.setState({ hasError: false })
-    this.props.onRetry?.()
-  }
+    ;[-0.06, 0.06].forEach((x) => {
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 8), metal)
+      pin.position.set(x, -0.35, 0)
+      group.add(pin)
+    })
+  } else if (componentId === 'button') {
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.22, 1.1), dark)
+    group.add(base)
 
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="w-full h-64 flex items-center justify-center text-black/40 dark:text-white/40">
-          <div className="text-center px-4">
-            <p className="text-sm">3D preview unavailable</p>
-            <button
-              onClick={this.handleRetry}
-              className="mt-2 text-xs underline underline-offset-2 text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors"
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      )
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.6), new THREE.MeshStandardMaterial({ color: powered ? '#111111' : '#444444' }))
+    cap.position.y = powered ? 0.12 : 0.2
+    group.add(cap)
+  } else {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.5), dark)
+    group.add(body)
+
+    const pinCount = componentId === 'transistor' ? 3 : 2
+    const spacing = pinCount === 3 ? 0.28 : 0.4
+    for (let i = 0; i < pinCount; i++) {
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.8, 12), metal)
+      pin.position.set((i - (pinCount - 1) / 2) * spacing, -0.65, 0)
+      group.add(pin)
     }
-    return this.props.children
   }
-}
 
-function ModelSelector({ componentId, powered }: ComponentViewerProps) {
-  switch (componentId) {
-    case 'resistor':
-      return <ResistorModel />
-    case 'led':
-      return <LEDModel powered={powered} />
-    case 'button':
-      return <ButtonModel powered={powered} />
-    case 'speaker':
-      return <SpeakerModel powered={powered} />
-    case 'capacitor':
-      return <CapacitorModel />
-    case 'potentiometer':
-      return <PotentiometerModel />
-    case 'diode':
-      return <DiodeModel />
-    case 'transistor':
-      return <TransistorModel />
-    case 'servo':
-      return <GenericModel variant="servo" powered={powered} />
-    case 'dc-motor':
-      return <GenericModel variant="dc-motor" powered={powered} />
-    case 'photoresistor':
-      return <GenericModel variant="photoresistor" />
-    case 'temp-sensor':
-      return <GenericModel variant="temp-sensor" />
-    case 'ultrasonic':
-      return <GenericModel variant="ultrasonic" />
-    case 'lcd':
-      return <GenericModel variant="lcd" />
-    case 'relay':
-      return <GenericModel variant="relay" powered={powered} />
-    case 'rgb-led':
-      return <GenericModel variant="rgb-led" powered={powered} />
-    default:
-      return <GenericModel />
-  }
+  return group
 }
 
 export default function ComponentViewer({ componentId, powered }: ComponentViewerProps) {
@@ -112,9 +75,6 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
     setRetryKey((k) => k + 1)
   }, [])
 
-  // Lazy-render the Canvas only when near the viewport.
-  // Browsers limit WebGL contexts to ~8-16; we mount/unmount canvases
-  // as they enter/leave a generous margin around the viewport.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -124,55 +84,94 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
       return
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsVisible(entry.isIntersecting)
-      },
-      { rootMargin: '600px' }
-    )
+    const observer = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), {
+      rootMargin: '500px',
+    })
 
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    if (!isVisible || !containerRef.current) return
+
+    const container = containerRef.current
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color('rgb(245,245,245)')
+
+    const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100)
+    camera.position.set(0, 1, 3.5)
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setSize(container.clientWidth, container.clientHeight)
+    container.innerHTML = ''
+    container.appendChild(renderer.domElement)
+
+    const ambient = new THREE.AmbientLight('#ffffff', 0.5)
+    const key = new THREE.DirectionalLight('#ffffff', 1)
+    key.position.set(5, 5, 5)
+    const fill = new THREE.DirectionalLight('#ffffff', 0.3)
+    fill.position.set(-3, 2, -3)
+    scene.add(ambient, key, fill)
+
+    const model = createModel(componentId, powered)
+    scene.add(model)
+
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enablePan = false
+    controls.enableZoom = false
+    controls.minPolarAngle = Math.PI / 4
+    controls.maxPolarAngle = Math.PI / 1.5
+
+    let frameId = 0
+    const animate = () => {
+      frameId = window.requestAnimationFrame(animate)
+      model.rotation.y += 0.005
+      if (componentId === 'speaker' && powered) {
+        const s = 1 + Math.sin(performance.now() * 0.02) * 0.02
+        model.scale.setScalar(s)
+      }
+      controls.update()
+      renderer.render(scene, camera)
+    }
+    animate()
+
+    const onResize = () => {
+      if (!container.clientWidth || !container.clientHeight) return
+      camera.aspect = container.clientWidth / container.clientHeight
+      camera.updateProjectionMatrix()
+      renderer.setSize(container.clientWidth, container.clientHeight)
+    }
+
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', onResize)
+      controls.dispose()
+      renderer.dispose()
+      scene.clear()
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement)
+      }
+    }
+  }, [componentId, powered, isVisible, retryKey])
+
   return (
-    <div ref={containerRef} className="w-full h-64 cursor-grab active:cursor-grabbing">
-      {isVisible ? (
-        <CanvasErrorBoundary key={retryKey} onRetry={handleRetry}>
-          <Canvas
-            camera={{ position: [0, 1, 3.5], fov: 40 }}
-            dpr={[1, 2]}
-            gl={{ antialias: true, powerPreference: 'default' }}
-            performance={{ min: 0.5 }}
-            onCreated={({ gl }) => {
-              const canvas = gl.domElement
-              canvas.addEventListener('webglcontextlost', (e) => {
-                e.preventDefault()
-              })
-              canvas.addEventListener('webglcontextrestored', () => {
-                gl.setSize(canvas.clientWidth, canvas.clientHeight)
-              })
-            }}
-          >
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[5, 5, 5]} intensity={1} />
-            <directionalLight position={[-3, 2, -3]} intensity={0.3} />
-            <Suspense fallback={null}>
-              <ModelSelector componentId={componentId} powered={powered} />
-            </Suspense>
-            <OrbitControls
-              enableZoom={false}
-              enablePan={false}
-              minPolarAngle={Math.PI / 4}
-              maxPolarAngle={Math.PI / 1.5}
-            />
-          </Canvas>
-        </CanvasErrorBoundary>
-      ) : (
-        <div className="w-full h-64 flex items-center justify-center text-black/20 dark:text-white/20">
+    <div className="w-full h-64 cursor-grab active:cursor-grabbing relative">
+      <div ref={containerRef} className="w-full h-full" />
+      {!isVisible && (
+        <div className="absolute inset-0 flex items-center justify-center text-black/20 dark:text-white/20">
           <p className="text-sm">Loading 3D model...</p>
         </div>
       )}
+      <button
+        onClick={handleRetry}
+        className="absolute top-2 right-2 text-xs text-black/40 dark:text-white/40 underline underline-offset-2 hover:text-black/70 dark:hover:text-white/70"
+      >
+        Reload 3D
+      </button>
     </div>
   )
 }
