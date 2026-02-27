@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { HfInference } from '@huggingface/inference'
 import { electronicsComponents } from '@/data/components'
 
-const hf = new HfInference(process.env.HF_TOKEN)
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.HF_TOKEN) {
+    const token = process.env.HF_TOKEN
+    if (!token) {
       return NextResponse.json(
         { success: false, error: 'HF_TOKEN not configured. Add it to .env.local.' },
-        { status: 500 }
+        { status: 503 }
       )
     }
+
+    const hf = new HfInference(token)
 
     const { image } = await request.json()
     if (!image || typeof image !== 'string') {
@@ -24,6 +27,17 @@ export async function POST(request: NextRequest) {
     // Extract base64 data (remove data URL prefix if present)
     const base64Data = image.includes(',') ? image.split(',')[1] : image
     const imageBuffer = Buffer.from(base64Data, 'base64')
+
+    if (imageBuffer.byteLength > MAX_IMAGE_BYTES) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Image is too large for production inference. Please upload a smaller image.',
+        },
+        { status: 413 }
+      )
+    }
 
     // Build candidate labels from all components
     const candidateLabels = electronicsComponents.map((c) => c.clipLabel)

@@ -11,6 +11,8 @@ interface IdentifyResult {
   confidence: number
 }
 
+const IDENTIFY_TIMEOUT_MS = 15000
+
 export function useComponentIdentifier() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,16 +22,20 @@ export function useComponentIdentifier() {
       setIsAnalyzing(true)
       setError(null)
 
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), IDENTIFY_TIMEOUT_MS)
+
       try {
         const response = await fetch('/api/identify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: imageBase64 }),
+          signal: controller.signal,
         })
 
         const data = await response.json()
 
-        if (data.success) {
+        if (response.ok && data.success) {
           const component = electronicsComponents.find(
             (c) => c.id === data.componentId
           )
@@ -38,17 +44,22 @@ export function useComponentIdentifier() {
           }
           setError('Component not found in database.')
           return null
-        } else {
-          setError(
-            data.error ||
-              'Could not identify the component. Please try a clearer photo.'
-          )
+        }
+
+        setError(
+          data.error ||
+            'Could not identify the component. Please try a clearer photo.'
+        )
+        return null
+      } catch (caught) {
+        if (caught instanceof Error && caught.name === 'AbortError') {
+          setError('Identification timed out. Please try again.')
           return null
         }
-      } catch {
         setError('Network error. Check your connection and try again.')
         return null
       } finally {
+        clearTimeout(timeout)
         setIsAnalyzing(false)
       }
     },
