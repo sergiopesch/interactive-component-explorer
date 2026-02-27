@@ -12,7 +12,7 @@ type AppView = 'home' | 'analyzing' | 'result'
 
 export default function HomeClient() {
   const { isDark, toggle, mounted } = useTheme()
-  const { identify, isAnalyzing, error, clearError } = useComponentIdentifier()
+  const { identify, isAnalyzing, error, clearError, isModelLoading, modelLoadProgress } = useComponentIdentifier()
 
   const [view, setView] = useState<AppView>('home')
   const [identifiedComponent, setIdentifiedComponent] =
@@ -94,6 +94,21 @@ export default function HomeClient() {
               onImageSelected={handleImageSelected}
               isAnalyzing={isAnalyzing}
             />
+
+            {/* Model loading progress */}
+            {isModelLoading && (
+              <div className="mt-4 max-w-xs mx-auto">
+                <p className="text-xs text-black/50 dark:text-white/50 mb-1.5 text-center">
+                  Loading AI model{modelLoadProgress > 0 ? ` (${modelLoadProgress}%)` : '...'}
+                </p>
+                <div className="w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-black dark:bg-white transition-all duration-300"
+                    style={{ width: `${Math.max(2, modelLoadProgress)}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Error display */}
             {error && (
