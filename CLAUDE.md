@@ -10,9 +10,9 @@ Interactive electronics component explorer built with **Next.js 15**, **Three.js
 
 ```
 npm run dev       # Start dev server (localhost:3000)
-npm run build     # Production build
-npm run start     # Serve production build
+npm run build     # Production build (static export to out/)
 npm run lint      # Run ESLint (zero warnings enforced)
+npx serve out     # Serve the static build locally
 ```
 
 No environment variables needed. No `.env` file required.
@@ -156,6 +156,7 @@ That's it. The grid in `HomeClient.tsx` automatically renders all entries from t
 - **No global state library** — local React state + hooks only
 - **No external APIs** — all AI runs in-browser via Transformers.js + embedded ONNX models
 - **No environment variables** — the app needs zero configuration to run
+- **Static export** — `output: 'export'` in `next.config.js` produces pure static files in `out/`. No serverless functions (avoids the Vercel 250 MB limit). `next start` is not available; use `npx serve out` to preview locally
 - **WebGL context management** — `ComponentViewer` uses `IntersectionObserver` to lazy-render canvases, staying within browser WebGL context limits
 
 ## Interface Contracts
@@ -271,8 +272,9 @@ useComponentIdentifier() → {
 - Keep 3D models simple — primitive geometries only, no external .glb/.gltf files
 - No external API calls — all AI runs in-browser via embedded ONNX models
 - No environment variables — the app must work with zero configuration
+- No server-side routes — `output: 'export'` means no API routes, no middleware, no SSR
 - Model files in `public/models/` must stay under 100 MB each (GitHub file size limit)
-- Vercel-deployable with zero config (standard Next.js build output)
+- Deployable to any static host (Vercel, Netlify, Cloudflare Pages, S3, etc.)
 
 ## Testing
 

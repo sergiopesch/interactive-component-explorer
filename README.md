@@ -31,14 +31,14 @@ You can also **browse all 16 components** directly from the home screen with sea
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 15 (App Router, static export) |
 | 3D | Three.js via React Three Fiber + Drei |
 | Styling | Tailwind CSS (black & white palette) |
 | AI Runtime | Transformers.js 3 + ONNX Runtime Web (in-browser) |
 | Image Classification | CLIP ViT-B/16 (`Xenova/clip-vit-base-patch16`, int8 quantized) |
 | Text-to-Speech | MMS-TTS English (`Xenova/mms-tts-eng`, int8 quantized) |
 | Language | TypeScript |
-| Deploy | Vercel (zero-config) |
+| Deploy | Vercel, or any static host (pure static output to `out/`) |
 
 ## Getting Started
 
@@ -59,9 +59,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. That's it �
 ### Other commands
 
 ```bash
-npm run build    # Production build
-npm run start    # Serve production build
+npm run build    # Production build (outputs to out/)
 npm run lint     # Run ESLint
+npx serve out    # Serve the static build locally
 ```
 
 ## Project Structure
@@ -230,18 +230,23 @@ case 'my-component':
 - **Fast after first load** — Models are cached by the browser; repeat visits start instantly
 - **Simple 3D models** — Stylized primitives built from Three.js geometries
 - **Stable WebGL** — Context-managed canvas lifecycle prevents crashes when browsing many components
+- **Fully static** — `output: 'export'` produces pure static files; deployable anywhere with no server
 
 ## Deployment
 
-Deploy to Vercel — no environment variables needed:
+The app builds as a **fully static site** (`output: 'export'` in `next.config.js`). No serverless functions, no Node.js server — just HTML, JS, CSS, and model files in `out/`.
+
+### Vercel
 
 ```bash
 npx vercel --prod
 ```
 
-Or connect the GitHub repository to [vercel.com](https://vercel.com) for automatic deployments.
+Or connect the GitHub repository to [vercel.com](https://vercel.com) for automatic deployments. No environment variables needed. The `public/models/` directory (185 MB) is served as static assets from Vercel's Edge Network.
 
-The `public/models/` directory (185 MB) is served as static assets from Vercel's Edge Network, giving users fast model downloads from the nearest CDN node.
+### Any static host
+
+The `out/` directory can be deployed to any static hosting provider (Netlify, Cloudflare Pages, GitHub Pages, S3 + CloudFront, etc.). Just point your host at the `out/` folder after `npm run build`.
 
 ## Browser Support
 
