@@ -7,6 +7,11 @@ import ResistorModel from './models/ResistorModel'
 import LEDModel from './models/LEDModel'
 import ButtonModel from './models/ButtonModel'
 import SpeakerModel from './models/SpeakerModel'
+import CapacitorModel from './models/CapacitorModel'
+import PotentiometerModel from './models/PotentiometerModel'
+import DiodeModel from './models/DiodeModel'
+import TransistorModel from './models/TransistorModel'
+import GenericModel from './models/GenericModel'
 
 interface ComponentViewerProps {
   componentId: string
@@ -23,8 +28,16 @@ function ModelSelector({ componentId, powered }: ComponentViewerProps) {
       return <ButtonModel powered={powered} />
     case 'speaker':
       return <SpeakerModel powered={powered} />
+    case 'capacitor':
+      return <CapacitorModel />
+    case 'potentiometer':
+      return <PotentiometerModel />
+    case 'diode':
+      return <DiodeModel />
+    case 'transistor':
+      return <TransistorModel />
     default:
-      return null
+      return <GenericModel />
   }
 }
 

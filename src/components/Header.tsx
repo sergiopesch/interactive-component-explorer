@@ -15,7 +15,7 @@ export default function Header({ isDark, onToggleTheme, mounted }: HeaderProps) 
             Electronics Explorer
           </h1>
           <p className="text-sm text-black/50 dark:text-white/50 mt-0.5">
-            Learn about common components — click, rotate, and listen
+            Snap a photo and learn about electronic components
           </p>
         </div>
         {mounted && (
