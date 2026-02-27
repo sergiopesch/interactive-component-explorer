@@ -6,10 +6,15 @@ const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
-    const token = process.env.HF_TOKEN
+    const token = process.env.HF_TOKEN || process.env.HF_VARIABLE
     if (!token) {
       return NextResponse.json(
-        { success: false, error: 'HF_TOKEN not configured. Add it to .env.local.' },
+        {
+          success: false,
+          code: 'MISSING_HF_TOKEN',
+          error:
+            'Hugging Face token is not configured. Add HF_TOKEN (or HF_VARIABLE for Vercel) to your environment variables.',
+        },
         { status: 503 }
       )
     }
@@ -69,6 +74,7 @@ export async function POST(request: NextRequest) {
     if (!matchedComponent || topResult.score < 0.1) {
       return NextResponse.json({
         success: false,
+        code: 'COMPONENT_NOT_RECOGNIZED',
         error:
           'Could not identify the component. Try a clearer photo with good lighting.',
         topScores: results.slice(0, 3).map((r) => ({
@@ -89,6 +95,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
+        code: 'IDENTIFICATION_SERVICE_ERROR',
         error: 'AI service temporarily unavailable. Please try again in a moment.',
       },
       { status: 500 }

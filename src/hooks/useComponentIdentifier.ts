@@ -11,6 +11,9 @@ interface IdentifyResult {
   confidence: number
 }
 
+const UNRECOGNIZED_COMPONENT_MESSAGE =
+  "Thank you for your image — our component detective squad is still in training for this one. We are expanding the library and would love your feedback on X: @sergiopesch."
+
 const IDENTIFY_TIMEOUT_MS = 15000
 
 export function useComponentIdentifier() {
@@ -42,7 +45,12 @@ export function useComponentIdentifier() {
           if (component) {
             return { component, confidence: data.confidence }
           }
-          setError('Component not found in database.')
+          setError(UNRECOGNIZED_COMPONENT_MESSAGE)
+          return null
+        }
+
+        if (data.code === 'COMPONENT_NOT_RECOGNIZED') {
+          setError(UNRECOGNIZED_COMPONENT_MESSAGE)
           return null
         }
 

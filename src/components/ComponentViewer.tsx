@@ -36,6 +36,22 @@ function ModelSelector({ componentId, powered }: ComponentViewerProps) {
       return <DiodeModel />
     case 'transistor':
       return <TransistorModel />
+    case 'servo':
+      return <GenericModel variant="servo" />
+    case 'dc-motor':
+      return <GenericModel variant="dc-motor" />
+    case 'photoresistor':
+      return <GenericModel variant="photoresistor" />
+    case 'temp-sensor':
+      return <GenericModel variant="temp-sensor" />
+    case 'ultrasonic':
+      return <GenericModel variant="ultrasonic" />
+    case 'lcd':
+      return <GenericModel variant="lcd" />
+    case 'relay':
+      return <GenericModel variant="relay" />
+    case 'rgb-led':
+      return <GenericModel variant="rgb-led" />
     default:
       return <GenericModel />
   }
