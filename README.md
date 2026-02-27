@@ -55,6 +55,8 @@ Then add your Hugging Face API token:
 
 ```
 HF_TOKEN=hf_your_token_here
+# Optional alias used in some deployments (e.g. Vercel)
+HF_VARIABLE=hf_your_token_here
 ```
 
 Get a free token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
@@ -173,7 +175,10 @@ case 'my-component':
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HF_TOKEN` | Yes | Hugging Face API token for AI features (component identification + TTS). Free at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
+| `HF_TOKEN` | Yes* | Primary Hugging Face API token for AI features (component identification + TTS). Free at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
+| `HF_VARIABLE` | Yes* | Alternate token name supported for Vercel deployments. |
+
+*At least one of `HF_TOKEN` or `HF_VARIABLE` must be set.
 
 ## Design Principles
 
@@ -191,7 +196,7 @@ Deploy to Vercel:
 npx vercel
 ```
 
-Add `HF_TOKEN` to your Vercel project's Environment Variables in the dashboard.
+Add either `HF_TOKEN` or `HF_VARIABLE` to your Vercel project's Environment Variables in the dashboard.
 
 Or connect the GitHub repository to [vercel.com](https://vercel.com) for automatic deployments.
 

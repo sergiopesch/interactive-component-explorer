@@ -93,7 +93,7 @@ export default function HomeClient() {
               >
                 {showBrowse
                   ? 'Hide component library'
-                  : 'Or browse all 16 components'}
+                  : `Or browse all ${electronicsComponents.length} components`}
               </button>
             </div>
           </section>

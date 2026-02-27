@@ -5,10 +5,13 @@ const MAX_TEXT_LENGTH = 1000
 
 export async function POST(request: NextRequest) {
   try {
-    const token = process.env.HF_TOKEN
+    const token = process.env.HF_TOKEN || process.env.HF_VARIABLE
     if (!token) {
       return NextResponse.json(
-        { error: 'HF_TOKEN not configured.' },
+        {
+          error:
+            'Hugging Face token not configured. Set HF_TOKEN (or HF_VARIABLE on Vercel).',
+        },
         { status: 503 }
       )
     }
