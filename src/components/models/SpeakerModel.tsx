@@ -39,25 +39,37 @@ export default function SpeakerModel({ powered }: SpeakerModelProps) {
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
 
-      {/* Inner disc (vibrating element) */}
+      {/* Bottom plate (sealed) */}
+      <mesh position={[0, -0.16, 0]}>
+        <cylinderGeometry args={[0.71, 0.71, 0.02, 24]} />
+        <meshStandardMaterial color="#111111" />
+      </mesh>
+
+      {/* Inner disc (vibrating piezo element - brass-colored) */}
       <mesh ref={discRef} position={[0, 0.22, 0]}>
         <cylinderGeometry args={[0.55, 0.55, 0.06, 24]} />
         <meshStandardMaterial color="#d4af37" metalness={0.7} roughness={0.3} />
       </mesh>
 
-      {/* Center dot */}
+      {/* Center ceramic disc */}
       <mesh position={[0, 0.26, 0]}>
-        <cylinderGeometry args={[0.12, 0.12, 0.04, 16]} />
-        <meshStandardMaterial color="#333333" />
+        <cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />
+        <meshStandardMaterial color="#e5e7eb" roughness={0.5} />
       </mesh>
 
-      {/* Positive wire */}
+      {/* Sound hole (dark recess on top) */}
+      <mesh position={[0.35, 0.16, 0]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.02, 12]} />
+        <meshStandardMaterial color="#0a0a0a" />
+      </mesh>
+
+      {/* Positive wire (red) */}
       <mesh position={[-0.25, -0.35, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
         <meshStandardMaterial color="#cc3333" metalness={0.5} roughness={0.4} />
       </mesh>
 
-      {/* Negative wire */}
+      {/* Negative wire (black) */}
       <mesh position={[0.25, -0.35, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
         <meshStandardMaterial color="#222222" metalness={0.5} roughness={0.4} />

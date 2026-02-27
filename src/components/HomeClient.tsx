@@ -72,13 +72,13 @@ export default function HomeClient() {
 
             {/* Error display */}
             {error && (
-              <div className="mt-4 p-3 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-black/10 dark:border-white/10">
-                <p className="text-sm text-black/70 dark:text-white/70">
+              <div className="mt-6 p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-black/10 dark:border-white/10 text-left">
+                <p className="text-sm leading-relaxed text-black/70 dark:text-white/70">
                   {error}
                 </p>
                 <button
                   onClick={handleTryAnother}
-                  className="mt-2 text-sm font-medium underline text-black dark:text-white"
+                  className="mt-3 px-4 py-2 rounded-lg border border-black/20 dark:border-white/20 text-sm font-medium text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Try again
                 </button>
