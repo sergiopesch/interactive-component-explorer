@@ -11,7 +11,8 @@ interface LEDModelProps {
 export default function LEDModel({ powered }: LEDModelProps) {
   const groupRef = useRef<THREE.Group>(null)
   const glowRef = useRef<THREE.Mesh>(null)
-  const bulbRef = useRef<THREE.MeshStandardMaterial>(null)
+  const domeMatRef = useRef<THREE.MeshStandardMaterial>(null)
+  const baseMatRef = useRef<THREE.MeshStandardMaterial>(null)
   const intensityRef = useRef(0)
 
   useFrame((_, delta) => {
@@ -23,10 +24,16 @@ export default function LEDModel({ powered }: LEDModelProps) {
     const target = powered ? 1 : 0
     intensityRef.current += (target - intensityRef.current) * delta * 4
 
-    if (bulbRef.current) {
-      const emissiveIntensity = intensityRef.current * 2
-      bulbRef.current.emissiveIntensity = emissiveIntensity
-      bulbRef.current.opacity = 0.6 + intensityRef.current * 0.4
+    const emissive = intensityRef.current * 2
+    const opacity = 0.6 + intensityRef.current * 0.4
+
+    if (domeMatRef.current) {
+      domeMatRef.current.emissiveIntensity = emissive
+      domeMatRef.current.opacity = opacity
+    }
+    if (baseMatRef.current) {
+      baseMatRef.current.emissiveIntensity = emissive
+      baseMatRef.current.opacity = opacity
     }
 
     if (glowRef.current) {
@@ -38,11 +45,11 @@ export default function LEDModel({ powered }: LEDModelProps) {
 
   return (
     <group ref={groupRef}>
-      {/* LED dome */}
+      {/* LED dome (top half-sphere) */}
       <mesh position={[0, 0.3, 0]}>
         <sphereGeometry args={[0.4, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial
-          ref={bulbRef}
+          ref={domeMatRef}
           color="#ff3333"
           emissive="#ff0000"
           emissiveIntensity={0}
@@ -51,21 +58,16 @@ export default function LEDModel({ powered }: LEDModelProps) {
         />
       </mesh>
 
-      {/* LED base cylinder */}
+      {/* LED cylindrical base (epoxy body) */}
       <mesh position={[0, 0.05, 0]}>
         <cylinderGeometry args={[0.4, 0.4, 0.5, 16]} />
         <meshStandardMaterial
+          ref={baseMatRef}
           color="#ff3333"
           emissive="#ff0000"
           emissiveIntensity={0}
           transparent
           opacity={0.7}
-          ref={(mat) => {
-            if (mat && bulbRef.current) {
-              mat.emissiveIntensity = bulbRef.current.emissiveIntensity
-              mat.opacity = bulbRef.current.opacity
-            }
-          }}
         />
       </mesh>
 
@@ -75,19 +77,25 @@ export default function LEDModel({ powered }: LEDModelProps) {
         <meshBasicMaterial color="#ff4444" transparent opacity={0} />
       </mesh>
 
-      {/* Flat bottom rim */}
+      {/* Flange rim with cathode flat */}
       <mesh position={[0, -0.22, 0]}>
         <cylinderGeometry args={[0.45, 0.42, 0.06, 16]} />
         <meshStandardMaterial color="#cccccc" metalness={0.6} roughness={0.3} />
       </mesh>
 
-      {/* Anode (longer leg) */}
+      {/* Cathode flat marker on rim */}
+      <mesh position={[0.42, -0.22, 0]}>
+        <boxGeometry args={[0.1, 0.06, 0.25]} />
+        <meshStandardMaterial color="#aaaaaa" metalness={0.6} roughness={0.3} />
+      </mesh>
+
+      {/* Anode (longer leg — positive) */}
       <mesh position={[-0.12, -0.95, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 1.4, 8]} />
         <meshStandardMaterial color="#888888" metalness={0.8} roughness={0.2} />
       </mesh>
 
-      {/* Cathode (shorter leg) */}
+      {/* Cathode (shorter leg — negative) */}
       <mesh position={[0.12, -0.8, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 1.1, 8]} />
         <meshStandardMaterial color="#888888" metalness={0.8} roughness={0.2} />

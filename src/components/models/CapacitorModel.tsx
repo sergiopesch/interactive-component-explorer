@@ -27,8 +27,12 @@ export default function CapacitorModel() {
         <meshStandardMaterial color="#c0c0c0" metalness={0.7} roughness={0.3} />
       </mesh>
 
-      {/* Top scoring marks (K-shaped vent) */}
-      <mesh position={[0, 0.88, 0]} rotation={[0, 0, 0]}>
+      {/* Top scoring marks (K-shaped pressure vent) */}
+      <mesh position={[0, 0.88, 0]}>
+        <boxGeometry args={[0.5, 0.02, 0.03]} />
+        <meshStandardMaterial color="#888888" metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.88, 0]} rotation={[0, Math.PI / 2, 0]}>
         <boxGeometry args={[0.5, 0.02, 0.03]} />
         <meshStandardMaterial color="#888888" metalness={0.5} roughness={0.4} />
       </mesh>
