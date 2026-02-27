@@ -188,12 +188,18 @@ case 'my-component':
 - **Simple 3D models** — Stylized primitives built from Three.js geometries
 - **Graceful fallbacks** — Web Speech API if HF TTS is unavailable
 
+## Git & Branch Strategy
+
+- Use a **single long-lived branch**: `main` (the repository default branch).
+- Do not create parallel deploy branches (`master`, `work`, etc.).
+- Deploy from the default branch only (via Vercel Git integration or `vercel --prod` from `main`).
+
 ## Deployment
 
 Deploy to Vercel:
 
 ```bash
-npx vercel
+npx vercel --prod
 ```
 
 Add either `HF_TOKEN` or `HF_VARIABLE` to your Vercel project's Environment Variables in the dashboard.
