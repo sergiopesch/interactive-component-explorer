@@ -1,26 +1,28 @@
 # Electronics Explorer
 
-An AI-powered learning app that identifies electronic components from photos. Snap a picture of a resistor, LED, capacitor, or any Arduino Student Kit part — and instantly get an interactive 3D model, beginner-friendly specs, wiring instructions, and voice-guided descriptions.
+An AI-powered learning app that identifies electronic components from photos. Snap a picture of a resistor, LED, capacitor, or any Arduino Student Kit part — and instantly get an interactive 3D model, beginner-friendly specs, wiring instructions, voice-guided descriptions, and detailed datasheet information for advanced users.
 
 ## How It Works
 
 1. **Snap or upload** — Take a photo with your camera or drag and drop an image
-2. **AI identifies it** — CLIP (OpenAI's vision model on Hugging Face) classifies the component
-3. **Learn about it** — See an interactive 3D model, specifications, circuit examples, and description
-4. **Listen** — AI-powered text-to-speech reads the description aloud (Hugging Face MMS-TTS)
+2. **AI identifies it** — A Vision Language Model analyzes the image and identifies the component (with VQA and CLIP fallbacks for reliability)
+3. **Learn about it** — See an interactive 3D model, specifications, circuit examples, and a plain-language description
+4. **Listen** — Streaming AI text-to-speech reads the description aloud sentence by sentence
+5. **Go deeper** — Toggle "Datasheet Details" for max ratings, pin configurations, electrical characteristics, part numbers, and pro tips
 
-You can also **browse all 16 components** directly from the home screen.
+You can also **browse all 16 components** directly from the home screen with search and category filtering.
 
 ## Features
 
-- **AI component identification** — Upload a photo and CLIP zero-shot classification identifies the component
-- **AI text-to-speech** — Natural voice descriptions via Hugging Face MMS-TTS, with Web Speech API fallback
-- **Interactive 3D models** — Rotate resistors, LEDs, capacitors, transistors, and more
+- **AI component identification** — 3-strategy fallback chain: Vision Language Model (Llama 3.2 Vision) → Visual QA (BLIP) → CLIP zero-shot classification
+- **Streaming AI text-to-speech** — Sentence-by-sentence audio streaming via Hugging Face MMS-TTS, with single-request and Web Speech API fallbacks
+- **Interactive 3D models** — Rotate resistors, LEDs, capacitors, transistors, and more (WebGL context-managed for stable browsing)
 - **Power simulation** — Toggle LEDs, press buttons, spin motors, and activate relays
+- **Beginner + Advanced modes** — Beginner-friendly descriptions by default; expandable datasheet details with min/typ/max tables, absolute maximum ratings, pin configurations, common part numbers, and pro tips
 - **16 components** — Resistor, LED, push button, piezo speaker, capacitor, potentiometer, diode, transistor, servo motor, DC motor, photoresistor, temperature sensor, ultrasonic sensor, LCD display, relay, RGB LED
 - **Dark / Light mode** — Persists across sessions
 - **Camera-first flow** — Designed for mobile: snap a photo and learn
-- **Beginner-friendly** — Plain language, real circuit examples, no jargon
+- **Stable browse mode** — WebGL contexts are created on demand and kept alive to prevent crashes when browsing all components
 
 ## Tech Stack
 
@@ -29,8 +31,10 @@ You can also **browse all 16 components** directly from the home screen.
 | Framework | Next.js 15 (App Router) |
 | 3D | Three.js via React Three Fiber + Drei |
 | Styling | Tailwind CSS (black & white palette) |
-| Computer Vision | CLIP (`openai/clip-vit-large-patch14`) via Hugging Face Inference API |
-| Text-to-Speech | MMS-TTS (`facebook/mms-tts-eng`) via Hugging Face Inference API |
+| Image Analysis (primary) | Llama 3.2 11B Vision (`meta-llama/Llama-3.2-11B-Vision-Instruct`) via Hugging Face Inference API |
+| Image Analysis (fallback 1) | BLIP VQA (`Salesforce/blip-vqa-large`) via Hugging Face Inference API |
+| Image Analysis (fallback 2) | CLIP (`openai/clip-vit-large-patch14`) via Hugging Face Inference API |
+| Text-to-Speech | MMS-TTS (`facebook/mms-tts-eng`) via Hugging Face Inference API (streaming + single-request) |
 | TTS Fallback | Web Speech API (browser-native) |
 | Language | TypeScript |
 | Deploy | Vercel (zero-config) |
@@ -87,14 +91,15 @@ src/
 │   ├── manifest.ts             # PWA manifest
 │   ├── globals.css             # Tailwind directives, animations
 │   └── api/
-│       ├── identify/route.ts   # CLIP zero-shot image classification
-│       └── speak/route.ts      # HF text-to-speech proxy
+│       ├── identify/route.ts   # Multi-strategy image identification (VLM → VQA → CLIP)
+│       ├── speak/route.ts      # Single-request HF text-to-speech
+│       └── speak-stream/route.ts # Streaming sentence-by-sentence TTS (NDJSON)
 ├── components/
 │   ├── Header.tsx              # App header with dark/light toggle
 │   ├── HomeClient.tsx          # Main app: camera flow + browse grid
 │   ├── ImageUpload.tsx         # Drag & drop / camera image upload
-│   ├── ComponentCard.tsx       # Card: 3D viewer + specs + voice + power
-│   ├── ComponentViewer.tsx     # Three.js canvas with model router
+│   ├── ComponentCard.tsx       # Card: 3D viewer + specs + voice + power + datasheet
+│   ├── ComponentViewer.tsx     # Three.js canvas with model router + context management
 │   └── models/
 │       ├── ResistorModel.tsx
 │       ├── LEDModel.tsx
@@ -106,33 +111,45 @@ src/
 │       ├── TransistorModel.tsx
 │       └── GenericModel.tsx    # Fallback for components without custom models
 ├── data/
-│   └── components.ts           # 16 component definitions (single source of truth)
+│   └── components.ts           # 16 component definitions + datasheet info
 └── hooks/
     ├── useTheme.ts              # Dark/light mode with localStorage
-    ├── useSpeech.ts             # HF TTS with Web Speech API fallback
-    └── useComponentIdentifier.ts # CLIP identification hook
+    ├── useSpeech.ts             # Streaming TTS → single TTS → Web Speech fallback
+    └── useComponentIdentifier.ts # Multi-strategy identification hook
 ```
+
+## API Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/identify` | POST | Identifies an electronic component from a base64-encoded image. Uses a 3-strategy chain: VLM chat completion → BLIP Visual QA → CLIP zero-shot. Returns `{ componentId, confidence, label, reasoning }`. |
+| `/api/speak` | POST | Generates speech audio from text using Hugging Face MMS-TTS. Returns a single audio blob (FLAC). |
+| `/api/speak-stream` | POST | Streaming TTS. Splits text into sentences, generates audio per sentence, and streams results as NDJSON. Each line: `{ index, total, audio: "base64..." }`. Client starts playback after the first sentence arrives. |
 
 ## Components Included
 
-| Component | Category | 3D Model | Interactive |
-|-----------|----------|----------|------------|
-| Resistor | Passive | Custom | Rotate |
-| LED | Output | Custom | Rotate, Power on/off |
-| Push Button | Input | Custom | Rotate, Press |
-| Piezo Speaker | Output | Custom | Rotate, Power on/off |
-| Capacitor | Passive | Custom | Rotate |
-| Potentiometer | Input | Custom | Rotate |
-| Diode | Passive | Custom | Rotate |
-| Transistor | Active | Custom | Rotate |
-| Servo Motor | Output | Generic | Rotate, Power on/off |
-| DC Motor | Output | Generic | Rotate, Power on/off |
-| Photoresistor (LDR) | Input | Generic | Rotate |
-| Temperature Sensor | Input | Generic | Rotate |
-| Ultrasonic Sensor | Input | Generic | Rotate |
-| LCD Display | Output | Generic | Rotate |
-| Relay | Active | Generic | Rotate, Power on/off |
-| RGB LED | Output | Generic | Rotate, Power on/off |
+| Component | Category | 3D Model | Interactive | Datasheet |
+|-----------|----------|----------|------------|-----------|
+| Resistor | Passive | Custom | Rotate | Yes |
+| LED | Output | Custom | Rotate, Power on/off | Yes |
+| Push Button | Input | Custom | Rotate, Press | Yes |
+| Piezo Speaker | Output | Custom | Rotate, Power on/off | Yes |
+| Capacitor | Passive | Custom | Rotate | Yes |
+| Potentiometer | Input | Custom | Rotate | Yes |
+| Diode | Passive | Custom | Rotate | Yes |
+| Transistor | Active | Custom | Rotate | Yes |
+| Servo Motor | Output | Generic | Rotate, Power on/off | Yes |
+| DC Motor | Output | Generic | Rotate, Power on/off | Yes |
+| Photoresistor (LDR) | Input | Generic | Rotate | Yes |
+| Temperature Sensor | Input | Generic | Rotate | Yes |
+| Ultrasonic Sensor | Input | Generic | Rotate | Yes |
+| LCD Display | Output | Generic | Rotate | Yes |
+| Relay | Active | Generic | Rotate, Power on/off | Yes |
+| RGB LED | Output | Generic | Rotate, Power on/off | Yes |
+
+Each component card includes:
+- **Beginner view**: Plain-language description, key specs, circuit example, voice description, 3D model
+- **Advanced view** (expandable): Absolute maximum ratings, pin configuration, min/typ/max electrical characteristics, common part numbers, pro tips
 
 ## Adding New Components
 
@@ -155,6 +172,15 @@ Add an entry to the array in `src/data/components.ts`:
   ],
   circuitExample: 'How to wire it up...',
   clipLabel: 'a photo of my component',
+  datasheetInfo: {               // optional — enables "Datasheet Details" accordion
+    maxRatings: [{ parameter: 'Max Voltage', value: '5 V' }],
+    pinout: 'Pin 1 = VCC, Pin 2 = GND...',
+    characteristics: [
+      { parameter: 'Operating Voltage', min: '3.3', typical: '5', max: '5.5', unit: 'V' },
+    ],
+    partNumbers: ['PART-001', 'PART-002'],
+    tips: 'Expert advice for experienced users...',
+  },
 }
 ```
 
@@ -184,9 +210,11 @@ case 'my-component':
 
 - **Black and white only** — Clean monochrome UI, realistic colors only in 3D models
 - **Camera-first** — Primary flow is snap-and-learn, browsing is secondary
-- **Beginner-first** — Plain language, real examples, no unexplained jargon
+- **Beginner-first, expert-ready** — Plain language by default; expandable datasheet details for experienced users
+- **Multi-strategy AI** — Fallback chains for both identification and TTS ensure the app works even when individual models are unavailable
 - **Simple 3D models** — Stylized primitives built from Three.js geometries
-- **Graceful fallbacks** — Web Speech API if HF TTS is unavailable
+- **Stable WebGL** — Context-managed canvas lifecycle prevents crashes when browsing many components
+- **Graceful fallbacks** — Streaming TTS → single-request TTS → Web Speech API
 
 ## Git & Branch Strategy
 

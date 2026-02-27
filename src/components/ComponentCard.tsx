@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { ElectronicsComponent } from '@/data/components'
 import { useSpeech } from '@/hooks/useSpeech'
@@ -23,42 +23,8 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
   const cardRef = useRef<HTMLElement>(null)
   const [powered, setPowered] = useState(false)
   const [isViewerEnabled, setIsViewerEnabled] = useState(!defer3D)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const { speak, stop, isSpeaking } = useSpeech()
-
-  useEffect(() => {
-    if (!defer3D) {
-      setIsViewerEnabled(true)
-    }
-  }, [defer3D])
-
-  useEffect(() => {
-    if (!defer3D || isViewerEnabled) {
-      return
-    }
-
-    const card = cardRef.current
-    if (!card) {
-      return
-    }
-
-    if (typeof IntersectionObserver === 'undefined') {
-      setIsViewerEnabled(true)
-      return
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsViewerEnabled(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '240px' }
-    )
-
-    observer.observe(card)
-    return () => observer.disconnect()
-  }, [defer3D, isViewerEnabled])
 
   const handleVoice = () => {
     if (isSpeaking) {
@@ -67,6 +33,8 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
       speak(component.voiceDescription)
     }
   }
+
+  const datasheet = component.datasheetInfo
 
   return (
     <article
@@ -81,9 +49,14 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
           <button
             type="button"
             onClick={() => setIsViewerEnabled(true)}
-            className="w-full h-64 flex items-center justify-center text-sm font-medium text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            className="w-full h-64 flex flex-col items-center justify-center gap-2 text-sm font-medium text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             aria-label={`Load 3D preview for ${component.name}`}
           >
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
             Load 3D preview
           </button>
         )}
@@ -180,6 +153,147 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
             {component.circuitExample}
           </p>
         </div>
+
+        {/* Advanced / Datasheet Mode */}
+        {datasheet && (
+          <div className="border-t border-black/10 dark:border-white/10 pt-4 -mx-6 px-6">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors group"
+            >
+              <span className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                {showAdvanced ? 'Hide Datasheet Details' : 'Datasheet Details'}
+              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 space-y-5 animate-in">
+                {/* Absolute Maximum Ratings */}
+                {datasheet.maxRatings.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/40 mb-2">
+                      Absolute Maximum Ratings
+                    </h4>
+                    <div className="overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-neutral-50 dark:bg-neutral-900 border-b border-black/5 dark:border-white/5">
+                            <th className="text-left px-3 py-2 text-xs font-medium text-black/50 dark:text-white/50">Parameter</th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-black/50 dark:text-white/50">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {datasheet.maxRatings.map((rating, i) => (
+                            <tr key={rating.parameter} className={i > 0 ? 'border-t border-black/5 dark:border-white/5' : ''}>
+                              <td className="px-3 py-2 text-black/70 dark:text-white/70">{rating.parameter}</td>
+                              <td className="px-3 py-2 text-right font-mono text-black dark:text-white">{rating.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pin Configuration */}
+                {datasheet.pinout && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/40 mb-2">
+                      Pin Configuration
+                    </h4>
+                    <p className="text-sm leading-relaxed text-black/70 dark:text-white/70 bg-neutral-50 dark:bg-neutral-900 rounded-lg p-3 border border-black/5 dark:border-white/5 font-mono">
+                      {datasheet.pinout}
+                    </p>
+                  </div>
+                )}
+
+                {/* Key Electrical Characteristics */}
+                {datasheet.characteristics.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/40 mb-2">
+                      Key Electrical Characteristics
+                    </h4>
+                    <div className="overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-neutral-50 dark:bg-neutral-900 border-b border-black/5 dark:border-white/5">
+                            <th className="text-left px-3 py-2 text-xs font-medium text-black/50 dark:text-white/50">Parameter</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-black/50 dark:text-white/50">Min</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-black/50 dark:text-white/50">Typ</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-black/50 dark:text-white/50">Max</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-black/50 dark:text-white/50">Unit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {datasheet.characteristics.map((char, i) => (
+                            <tr key={char.parameter} className={i > 0 ? 'border-t border-black/5 dark:border-white/5' : ''}>
+                              <td className="px-3 py-2 text-black/70 dark:text-white/70">{char.parameter}</td>
+                              <td className="px-2 py-2 text-center font-mono text-black/60 dark:text-white/60">{char.min || '-'}</td>
+                              <td className="px-2 py-2 text-center font-mono text-black dark:text-white">{char.typical || '-'}</td>
+                              <td className="px-2 py-2 text-center font-mono text-black/60 dark:text-white/60">{char.max || '-'}</td>
+                              <td className="px-2 py-2 text-center font-mono text-xs text-black/50 dark:text-white/50">{char.unit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Common Part Numbers */}
+                {datasheet.partNumbers.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/40 mb-2">
+                      Common Part Numbers
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {datasheet.partNumbers.map((pn) => (
+                        <span
+                          key={pn}
+                          className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 border border-black/5 dark:border-white/5 text-xs font-mono text-black/80 dark:text-white/80"
+                        >
+                          {pn}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pro Tips */}
+                {datasheet.tips && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/40 mb-2">
+                      Pro Tips
+                    </h4>
+                    <p className="text-sm leading-relaxed text-black/70 dark:text-white/70 bg-neutral-50 dark:bg-neutral-900 rounded-lg p-3 border border-black/5 dark:border-white/5">
+                      {datasheet.tips}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </article>
   )
