@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { ElectronicsComponent } from '@/data/components'
 import { useSpeech } from '@/hooks/useSpeech'
@@ -20,6 +20,7 @@ interface ComponentCardProps {
 }
 
 function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
+  const cardRef = useRef<HTMLElement>(null)
   const [powered, setPowered] = useState(false)
   const [isViewerEnabled, setIsViewerEnabled] = useState(!defer3D)
   const { speak, stop, isSpeaking } = useSpeech()
@@ -30,6 +31,35 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
     }
   }, [defer3D])
 
+  useEffect(() => {
+    if (!defer3D || isViewerEnabled) {
+      return
+    }
+
+    const card = cardRef.current
+    if (!card) {
+      return
+    }
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsViewerEnabled(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsViewerEnabled(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '240px' }
+    )
+
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [defer3D, isViewerEnabled])
+
   const handleVoice = () => {
     if (isSpeaking) {
       stop()
@@ -39,7 +69,10 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
   }
 
   return (
-    <article className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black transition-colors">
+    <article
+      ref={cardRef}
+      className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black transition-colors"
+    >
       {/* 3D Viewer */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-black/5 dark:border-white/5 relative">
         {isViewerEnabled ? (
