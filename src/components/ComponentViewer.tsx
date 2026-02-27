@@ -126,9 +126,12 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsVisible(entry.isIntersecting)
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
       },
-      { rootMargin: '200px' }
+      { rootMargin: '400px' }
     )
 
     observer.observe(el)

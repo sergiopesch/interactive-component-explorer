@@ -6,9 +6,10 @@ import {
   type ElectronicsComponent,
 } from '@/data/components'
 
-interface IdentifyResult {
+export interface IdentifyResult {
   component: ElectronicsComponent
   confidence: number
+  reasoning?: string
 }
 
 const UNRECOGNIZED_COMPONENT_MESSAGE =
@@ -17,7 +18,7 @@ const UNRECOGNIZED_COMPONENT_MESSAGE =
 const SERVICE_UNAVAILABLE_MESSAGE =
   'The AI identification service is temporarily unavailable. Please try again in a moment.'
 
-const IDENTIFY_TIMEOUT_MS = 15000
+const IDENTIFY_TIMEOUT_MS = 45000
 
 interface IdentifyApiResponse {
   success?: boolean
@@ -25,6 +26,8 @@ interface IdentifyApiResponse {
   error?: string
   componentId?: string
   confidence?: number
+  label?: string
+  reasoning?: string
   topScores?: Array<{
     componentId?: string
     score?: number
@@ -77,6 +80,7 @@ export function useComponentIdentifier() {
               component,
               confidence:
                 typeof data.confidence === 'number' ? data.confidence : 0,
+              reasoning: data.reasoning,
             }
           }
           setError(UNRECOGNIZED_COMPONENT_MESSAGE)
@@ -110,7 +114,6 @@ export function useComponentIdentifier() {
           return null
         }
 
-        // Friendly message for missing API key (local dev or Vercel misconfiguration)
         if (data.code === 'MISSING_HF_TOKEN') {
           setError(SERVICE_UNAVAILABLE_MESSAGE)
           return null
