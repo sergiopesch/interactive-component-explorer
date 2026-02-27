@@ -16,13 +16,11 @@ const ComponentViewer = dynamic(() => import('./ComponentViewer'), {
 
 interface ComponentCardProps {
   component: ElectronicsComponent
-  defer3D?: boolean
 }
 
-function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
+function ComponentCard({ component }: ComponentCardProps) {
   const cardRef = useRef<HTMLElement>(null)
   const [powered, setPowered] = useState(false)
-  const [isViewerEnabled, setIsViewerEnabled] = useState(!defer3D)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const { speak, stop, isSpeaking } = useSpeech()
 
@@ -43,28 +41,10 @@ function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
     >
       {/* 3D Viewer */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-black/5 dark:border-white/5 relative">
-        {isViewerEnabled ? (
-          <ComponentViewer componentId={component.id} powered={powered} />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsViewerEnabled(true)}
-            className="w-full h-64 flex flex-col items-center justify-center gap-2 text-sm font-medium text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            aria-label={`Load 3D preview for ${component.name}`}
-          >
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-            Load 3D preview
-          </button>
-        )}
-        {isViewerEnabled && (
-          <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-black/30 dark:text-white/30">
-            Click and drag to rotate
-          </p>
-        )}
+        <ComponentViewer componentId={component.id} powered={powered} />
+        <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-black/30 dark:text-white/30">
+          Click and drag to rotate
+        </p>
       </div>
 
       {/* Content */}
