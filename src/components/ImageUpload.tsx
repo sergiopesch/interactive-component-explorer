@@ -78,6 +78,7 @@ export default function ImageUpload({
 }: ImageUploadProps) {
   const [dragActive, setDragActive] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -96,23 +97,22 @@ export default function ImageUpload({
         return
       }
 
+      setIsProcessing(true)
       try {
         const resized = await optimizeImageForUpload(file)
         setPreview(resized)
+        // Auto-submit: immediately start identification after optimizing the image
+        onImageSelected(resized)
       } catch {
         setError(
           'Could not process this image format. Try JPG or PNG from your photo library.'
         )
+      } finally {
+        setIsProcessing(false)
       }
     },
-    []
+    [onImageSelected]
   )
-
-  const handleSubmit = useCallback(() => {
-    if (preview) {
-      onImageSelected(preview)
-    }
-  }, [preview, onImageSelected])
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,12 +142,7 @@ export default function ImageUpload({
     setDragActive(false)
   }, [])
 
-  const clearPreview = useCallback(() => {
-    setPreview(null)
-    setError(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (cameraInputRef.current) cameraInputRef.current.value = ''
-  }, [])
+  const isBusy = isProcessing || isAnalyzing
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4">
@@ -182,15 +177,22 @@ export default function ImageUpload({
               </svg>
             </div>
 
-            <p className="text-sm text-black/50 dark:text-white/50 mb-4">
-              Drag and drop an image here
-            </p>
+            {isProcessing ? (
+              <p className="text-sm text-black/50 dark:text-white/50 mb-4">
+                Processing image...
+              </p>
+            ) : (
+              <p className="text-sm text-black/50 dark:text-white/50 mb-4">
+                Drag and drop an image here
+              </p>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {/* Camera capture (mobile) */}
               <button
                 onClick={() => cameraInputRef.current?.click()}
-                className="px-5 py-2.5 rounded-lg border border-black dark:border-white bg-black dark:bg-white text-white dark:text-black text-sm font-medium hover:opacity-90 transition-opacity"
+                disabled={isBusy}
+                className="px-5 py-2.5 rounded-lg border border-black dark:border-white bg-black dark:bg-white text-white dark:text-black text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 Take a Photo
               </button>
@@ -198,7 +200,8 @@ export default function ImageUpload({
               {/* File upload */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-5 py-2.5 rounded-lg border border-black/20 dark:border-white/20 text-black dark:text-white text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                disabled={isBusy}
+                className="px-5 py-2.5 rounded-lg border border-black/20 dark:border-white/20 text-black dark:text-white text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
               >
                 Upload Image
               </button>
@@ -224,7 +227,7 @@ export default function ImageUpload({
         </>
       ) : (
         <>
-          {/* Image preview */}
+          {/* Image preview with automatic identification */}
           <div className="relative rounded-2xl overflow-hidden border border-black/10 dark:border-white/10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -234,29 +237,11 @@ export default function ImageUpload({
             />
             {isAnalyzing && (
               <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                <div className="bg-white dark:bg-black rounded-lg px-4 py-2 text-sm font-medium">
-                  Analyzing...
+                <div className="bg-white dark:bg-black rounded-lg px-4 py-2 text-sm font-medium text-black dark:text-white">
+                  Analyzing component...
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={handleSubmit}
-              disabled={isAnalyzing}
-              className="px-6 py-2.5 rounded-lg border border-black dark:border-white bg-black dark:bg-white text-white dark:text-black text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {isAnalyzing ? 'Analyzing...' : 'Identify Component'}
-            </button>
-            <button
-              onClick={clearPreview}
-              disabled={isAnalyzing}
-              className="px-5 py-2.5 rounded-lg border border-black/20 dark:border-white/20 text-black dark:text-white text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-            >
-              Clear
-            </button>
           </div>
         </>
       )}
