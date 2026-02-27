@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { ElectronicsComponent } from '@/data/components'
 import { useSpeech } from '@/hooks/useSpeech'
@@ -16,11 +16,19 @@ const ComponentViewer = dynamic(() => import('./ComponentViewer'), {
 
 interface ComponentCardProps {
   component: ElectronicsComponent
+  defer3D?: boolean
 }
 
-export default function ComponentCard({ component }: ComponentCardProps) {
+function ComponentCard({ component, defer3D = false }: ComponentCardProps) {
   const [powered, setPowered] = useState(false)
+  const [isViewerEnabled, setIsViewerEnabled] = useState(!defer3D)
   const { speak, stop, isSpeaking } = useSpeech()
+
+  useEffect(() => {
+    if (!defer3D) {
+      setIsViewerEnabled(true)
+    }
+  }, [defer3D])
 
   const handleVoice = () => {
     if (isSpeaking) {
@@ -34,10 +42,23 @@ export default function ComponentCard({ component }: ComponentCardProps) {
     <article className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black transition-colors">
       {/* 3D Viewer */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-black/5 dark:border-white/5 relative">
-        <ComponentViewer componentId={component.id} powered={powered} />
-        <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-black/30 dark:text-white/30">
-          Click and drag to rotate
-        </p>
+        {isViewerEnabled ? (
+          <ComponentViewer componentId={component.id} powered={powered} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsViewerEnabled(true)}
+            className="w-full h-64 flex items-center justify-center text-sm font-medium text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            aria-label={`Load 3D preview for ${component.name}`}
+          >
+            Load 3D preview
+          </button>
+        )}
+        {isViewerEnabled && (
+          <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-black/30 dark:text-white/30">
+            Click and drag to rotate
+          </p>
+        )}
       </div>
 
       {/* Content */}
@@ -107,14 +128,14 @@ export default function ComponentCard({ component }: ComponentCardProps) {
           <h3 className="text-xs font-bold uppercase tracking-wider text-black/40 dark:text-white/40 mb-2">
             Specifications
           </h3>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
             {component.specs.map((spec) => (
               <div key={spec.label}>
                 <dt className="text-xs text-black/40 dark:text-white/40">{spec.label}</dt>
                 <dd className="text-sm font-medium text-black dark:text-white">{spec.value}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
 
         {/* Circuit Example */}
@@ -130,3 +151,5 @@ export default function ComponentCard({ component }: ComponentCardProps) {
     </article>
   )
 }
+
+export default memo(ComponentCard)

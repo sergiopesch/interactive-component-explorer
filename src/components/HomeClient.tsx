@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Header from '@/components/Header'
 import ComponentCard from '@/components/ComponentCard'
 import ImageUpload from '@/components/ImageUpload'
@@ -19,6 +19,26 @@ export default function HomeClient() {
     useState<ElectronicsComponent | null>(null)
   const [confidence, setConfidence] = useState(0)
   const [showBrowse, setShowBrowse] = useState(false)
+  const [browseQuery, setBrowseQuery] = useState('')
+  const [browseCategory, setBrowseCategory] = useState<
+    'all' | ElectronicsComponent['category']
+  >('all')
+
+  const filteredComponents = useMemo(() => {
+    const normalizedQuery = browseQuery.trim().toLowerCase()
+    return electronicsComponents.filter((component) => {
+      if (browseCategory !== 'all' && component.category !== browseCategory) {
+        return false
+      }
+      if (!normalizedQuery) {
+        return true
+      }
+      return (
+        component.name.toLowerCase().includes(normalizedQuery) ||
+        component.description.toLowerCase().includes(normalizedQuery)
+      )
+    })
+  }, [browseCategory, browseQuery])
 
   const handleImageSelected = useCallback(
     async (base64: string) => {
@@ -141,22 +161,60 @@ export default function HomeClient() {
         {/* Browse All Components Grid */}
         {showBrowse && (
           <section className="mt-8">
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-black dark:text-white">
-                All Components
-              </h3>
-              <button
-                onClick={() => setShowBrowse(false)}
-                className="text-sm text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors"
-              >
-                Hide
-              </button>
+            <div className="mb-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-black dark:text-white">
+                  All Components
+                </h3>
+                <button
+                  onClick={() => setShowBrowse(false)}
+                  className="text-sm text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors"
+                >
+                  Hide
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+                <input
+                  type="text"
+                  value={browseQuery}
+                  onChange={(e) => setBrowseQuery(e.target.value)}
+                  placeholder="Search components..."
+                  className="w-full rounded-lg border border-black/20 dark:border-white/20 bg-white dark:bg-black px-3 py-2 text-sm text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-black/20 dark:focus:ring-white/20"
+                />
+                <select
+                  value={browseCategory}
+                  onChange={(e) =>
+                    setBrowseCategory(
+                      e.target.value as 'all' | ElectronicsComponent['category']
+                    )
+                  }
+                  className="rounded-lg border border-black/20 dark:border-white/20 bg-white dark:bg-black px-3 py-2 text-sm text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-black/20 dark:focus:ring-white/20"
+                >
+                  <option value="all">All categories</option>
+                  <option value="input">Input</option>
+                  <option value="output">Output</option>
+                  <option value="active">Active</option>
+                  <option value="passive">Passive</option>
+                </select>
+              </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {electronicsComponents.map((component) => (
-                <ComponentCard key={component.id} component={component} />
-              ))}
-            </div>
+
+            {filteredComponents.length === 0 ? (
+              <div className="rounded-2xl border border-black/10 dark:border-white/10 p-6 text-sm text-black/60 dark:text-white/60">
+                No components match your search.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {filteredComponents.map((component) => (
+                  <ComponentCard
+                    key={component.id}
+                    component={component}
+                    defer3D
+                  />
+                ))}
+              </div>
+            )}
           </section>
         )}
 

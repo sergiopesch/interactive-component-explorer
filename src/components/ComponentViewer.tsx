@@ -104,6 +104,11 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
     const el = containerRef.current
     if (!el) return
 
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true)
+      return
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         setIsVisible(entry.isIntersecting)
@@ -119,7 +124,12 @@ export default function ComponentViewer({ componentId, powered }: ComponentViewe
     <div ref={containerRef} className="w-full h-64 cursor-grab active:cursor-grabbing">
       {isVisible ? (
         <CanvasErrorBoundary>
-          <Canvas camera={{ position: [0, 1, 3.5], fov: 40 }}>
+          <Canvas
+            camera={{ position: [0, 1, 3.5], fov: 40 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: false, powerPreference: 'low-power' }}
+            performance={{ min: 0.5 }}
+          >
             <ambientLight intensity={0.5} />
             <directionalLight position={[5, 5, 5]} intensity={1} />
             <directionalLight position={[-3, 2, -3]} intensity={0.3} />

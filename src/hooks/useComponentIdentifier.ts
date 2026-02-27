@@ -12,12 +12,34 @@ interface IdentifyResult {
 }
 
 const UNRECOGNIZED_COMPONENT_MESSAGE =
-  "Thanks for the photo! Our AI component detective is scratching its virtual head on this one \u2014 it's either something impressively obscure or our model needs more coffee. We're actively expanding the library and would genuinely love your feedback. Drop us a line on X @sergiopesch \u2014 your input helps us get smarter!"
+  'Could not confidently identify the component from that image. Try a closer photo with better lighting and a plain background.'
 
 const SERVICE_UNAVAILABLE_MESSAGE =
-  "Our AI identification service is warming up \u2014 like a cold soldering iron, it needs a moment. If this keeps happening, let us know on X @sergiopesch!"
+  'The AI identification service is temporarily unavailable. Please try again in a moment.'
 
 const IDENTIFY_TIMEOUT_MS = 15000
+
+interface IdentifyApiResponse {
+  success?: boolean
+  code?: string
+  error?: string
+  componentId?: string
+  confidence?: number
+  topScores?: Array<{
+    componentId?: string
+    score?: number
+  }>
+}
+
+async function parseResponseBody(
+  response: Response
+): Promise<IdentifyApiResponse | null> {
+  try {
+    return (await response.json()) as IdentifyApiResponse
+  } catch {
+    return null
+  }
+}
 
 export function useComponentIdentifier() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -39,21 +61,52 @@ export function useComponentIdentifier() {
           signal: controller.signal,
         })
 
-        const data = await response.json()
+        const data = await parseResponseBody(response)
+
+        if (!data) {
+          setError('Invalid response from identification service.')
+          return null
+        }
 
         if (response.ok && data.success) {
           const component = electronicsComponents.find(
             (c) => c.id === data.componentId
           )
           if (component) {
-            return { component, confidence: data.confidence }
+            return {
+              component,
+              confidence:
+                typeof data.confidence === 'number' ? data.confidence : 0,
+            }
           }
           setError(UNRECOGNIZED_COMPONENT_MESSAGE)
           return null
         }
 
         if (data.code === 'COMPONENT_NOT_RECOGNIZED') {
-          setError(UNRECOGNIZED_COMPONENT_MESSAGE)
+          const suggestions = (data.topScores || [])
+            .map((entry) => {
+              const score = typeof entry.score === 'number' ? entry.score : null
+              const component = electronicsComponents.find(
+                (c) => c.id === entry.componentId
+              )
+              return score && component ? `${component.name} (${score}%)` : null
+            })
+            .filter((entry): entry is string => entry !== null)
+            .slice(0, 2)
+
+          if (suggestions.length > 0) {
+            setError(`${UNRECOGNIZED_COMPONENT_MESSAGE} Closest: ${suggestions.join(', ')}.`)
+          } else {
+            setError(UNRECOGNIZED_COMPONENT_MESSAGE)
+          }
+          return null
+        }
+
+        if (response.status === 413) {
+          setError(
+            'The image is too large to analyze. Please upload a smaller image.'
+          )
           return null
         }
 

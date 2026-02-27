@@ -8,7 +8,13 @@ export function useTheme() {
 
   useEffect(() => {
     setMounted(true)
-    const stored = localStorage.getItem('theme')
+    let stored: string | null = null
+    try {
+      stored = localStorage.getItem('theme')
+    } catch {
+      stored = null
+    }
+
     if (stored === 'dark') {
       setIsDark(true)
       document.documentElement.classList.add('dark')
@@ -29,10 +35,18 @@ export function useTheme() {
       const next = !prev
       if (next) {
         document.documentElement.classList.add('dark')
-        localStorage.setItem('theme', 'dark')
+        try {
+          localStorage.setItem('theme', 'dark')
+        } catch {
+          // Ignore storage write failures (private browsing, quota limits, etc.).
+        }
       } else {
         document.documentElement.classList.remove('dark')
-        localStorage.setItem('theme', 'light')
+        try {
+          localStorage.setItem('theme', 'light')
+        } catch {
+          // Ignore storage write failures (private browsing, quota limits, etc.).
+        }
       }
       return next
     })

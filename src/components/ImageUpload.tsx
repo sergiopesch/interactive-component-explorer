@@ -7,42 +7,69 @@ interface ImageUploadProps {
   isAnalyzing: boolean
 }
 
-function resizeImage(file: File, maxSize: number): Promise<string> {
+const MAX_IMAGE_DIMENSION = 1024
+const MAX_UPLOAD_BYTES = 1_800_000
+const JPEG_QUALITIES = [0.92, 0.86, 0.8, 0.74]
+
+function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image()
     const reader = new FileReader()
-
-    reader.onload = (e) => {
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let { width, height } = img
-
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round((height * maxSize) / width)
-            width = maxSize
-          } else {
-            width = Math.round((width * maxSize) / height)
-            height = maxSize
-          }
-        }
-
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'))
-          return
-        }
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', 0.8))
-      }
-      img.onerror = () => reject(new Error('Failed to load image'))
-      img.src = e.target?.result as string
-    }
+    reader.onload = () => resolve(String(reader.result || ''))
     reader.onerror = () => reject(new Error('Failed to read file'))
     reader.readAsDataURL(file)
   })
+}
+
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('Failed to load image'))
+    image.src = dataUrl
+  })
+}
+
+function estimateBytesFromDataUrl(dataUrl: string) {
+  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+  return Math.floor((base64.length * 3) / 4)
+}
+
+async function optimizeImageForUpload(file: File): Promise<string> {
+  const sourceDataUrl = await fileToDataUrl(file)
+  const image = await loadImage(sourceDataUrl)
+
+  const maxSide = Math.max(image.width, image.height)
+  const resizeScale = maxSide > MAX_IMAGE_DIMENSION ? MAX_IMAGE_DIMENSION / maxSide : 1
+  const baseWidth = Math.max(1, Math.round(image.width * resizeScale))
+  const baseHeight = Math.max(1, Math.round(image.height * resizeScale))
+
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('Could not get canvas context')
+  }
+
+  let bestCandidate = sourceDataUrl
+  let scale = 1
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    canvas.width = Math.max(1, Math.round(baseWidth * scale))
+    canvas.height = Math.max(1, Math.round(baseHeight * scale))
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    for (const quality of JPEG_QUALITIES) {
+      const candidate = canvas.toDataURL('image/jpeg', quality)
+      bestCandidate = candidate
+      if (estimateBytesFromDataUrl(candidate) <= MAX_UPLOAD_BYTES) {
+        return candidate
+      }
+    }
+
+    scale *= 0.8
+  }
+
+  return bestCandidate
 }
 
 export default function ImageUpload({
@@ -70,10 +97,12 @@ export default function ImageUpload({
       }
 
       try {
-        const resized = await resizeImage(file, 512)
+        const resized = await optimizeImageForUpload(file)
         setPreview(resized)
       } catch {
-        setError('Could not process the image. Please try another one.')
+        setError(
+          'Could not process this image format. Try JPG or PNG from your photo library.'
+        )
       }
     },
     []
