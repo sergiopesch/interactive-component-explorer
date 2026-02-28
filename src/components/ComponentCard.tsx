@@ -39,7 +39,7 @@ function ComponentCard({ component }: ComponentCardProps) {
       ref={cardRef}
       className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black transition-colors"
     >
-      {/* 3D Viewer */}
+      {/* 3D Viewer — auto-loads when scrolled into view via IntersectionObserver */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-black/5 dark:border-white/5 relative">
         <ComponentViewer componentId={component.id} powered={powered} />
         <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-black/30 dark:text-white/30">

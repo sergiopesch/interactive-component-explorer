@@ -292,9 +292,10 @@ function RgbLedModel({ powered }: { powered: boolean }) {
 export default function GenericModel({ variant = 'ic', powered = false }: GenericModelProps) {
   const groupRef = useRef<THREE.Group>(null)
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (groupRef.current) {
       groupRef.current.rotation.y += delta * 0.3
+      groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.05
     }
   })
 

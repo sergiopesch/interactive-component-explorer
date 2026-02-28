@@ -5,6 +5,7 @@ import {
   electronicsComponents,
   type ElectronicsComponent,
 } from '@/data/components'
+import { useLocalClassifier } from './useLocalClassifier'
 
 export interface IdentifyResult {
   component: ElectronicsComponent
@@ -12,139 +13,138 @@ export interface IdentifyResult {
   reasoning?: string
 }
 
-const UNRECOGNIZED_COMPONENT_MESSAGE =
-  'Could not confidently identify the component from that image. Try a closer photo with better lighting and a plain background.'
+// Maps each CLIP candidate label back to a component ID
+const CLIP_LABELS: { componentId: string; label: string }[] = []
 
-const SERVICE_UNAVAILABLE_MESSAGE =
-  'The AI identification service is temporarily unavailable. Please try again in a moment.'
-
-const IDENTIFY_TIMEOUT_MS = 45000
-
-interface IdentifyApiResponse {
-  success?: boolean
-  code?: string
-  error?: string
-  componentId?: string
-  confidence?: number
-  label?: string
-  reasoning?: string
-  topScores?: Array<{
-    componentId?: string
-    score?: number
-  }>
+// Additional label variants for better accuracy
+const EXTRA_LABELS: Record<string, string[]> = {
+  resistor: ['a photo of an axial resistor'],
+  led: ['a photo of a red LED', 'a photo of a through-hole LED'],
+  button: ['a photo of a push button', 'a photo of a tactile switch'],
+  speaker: ['a photo of a piezo buzzer'],
+  capacitor: ['a photo of a radial capacitor', 'a photo of an electrolytic capacitor'],
+  potentiometer: ['a photo of a rotary potentiometer'],
+  diode: ['a photo of a rectifier diode'],
+  transistor: ['a photo of a TO-92 transistor'],
+  servo: ['a photo of an SG90 servo motor'],
+  'dc-motor': ['a photo of a brushed DC motor'],
+  photoresistor: ['a photo of an LDR sensor'],
+  'temp-sensor': ['a photo of a TMP36 temperature sensor'],
+  ultrasonic: ['a photo of an HC-SR04 ultrasonic sensor'],
+  lcd: ['a photo of a 16x2 LCD module', 'a photo of an LCD1602 display'],
+  relay: ['a photo of a single-channel relay module'],
+  'rgb-led': ['a photo of a 4-pin RGB LED'],
 }
 
-async function parseResponseBody(
-  response: Response
-): Promise<IdentifyApiResponse | null> {
-  try {
-    return (await response.json()) as IdentifyApiResponse
-  } catch {
-    return null
+// Build label→componentId mapping once
+for (const component of electronicsComponents) {
+  const seen = new Set<string>()
+
+  const addLabel = (label: string) => {
+    const key = label.toLowerCase().trim()
+    if (!seen.has(key)) {
+      seen.add(key)
+      CLIP_LABELS.push({ componentId: component.id, label })
+    }
+  }
+
+  // Primary label from data
+  addLabel(component.clipLabel)
+
+  // Extra variants
+  for (const extra of EXTRA_LABELS[component.id] ?? []) {
+    addLabel(extra)
   }
 }
+
+const ALL_CANDIDATE_LABELS = CLIP_LABELS.map((l) => l.label)
 
 export function useComponentIdentifier() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { classify, isLoading, loadProgress, isClassifying } = useLocalClassifier()
 
   const identify = useCallback(
     async (imageBase64: string): Promise<IdentifyResult | null> => {
       setIsAnalyzing(true)
       setError(null)
 
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), IDENTIFY_TIMEOUT_MS)
-
       try {
-        const response = await fetch('/api/identify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: imageBase64 }),
-          signal: controller.signal,
-        })
+        const results = await classify(imageBase64, ALL_CANDIDATE_LABELS)
 
-        const data = await parseResponseBody(response)
-
-        if (!data) {
-          setError('Invalid response from identification service.')
+        if (!results || results.length === 0) {
+          setError('Could not classify the image. Try a clearer photo with good lighting.')
           return null
         }
 
-        if (response.ok && data.success) {
-          const component = electronicsComponents.find(
-            (c) => c.id === data.componentId
+        // Aggregate scores per component (best label score wins)
+        const componentScores = new Map<string, number>()
+        for (const result of results) {
+          const entry = CLIP_LABELS.find(
+            (l) => l.label.toLowerCase() === result.label.toLowerCase()
           )
-          if (component) {
-            return {
-              component,
-              confidence:
-                typeof data.confidence === 'number' ? data.confidence : 0,
-              reasoning: data.reasoning,
-            }
+          if (!entry) continue
+          const existing = componentScores.get(entry.componentId) ?? 0
+          if (result.score > existing) {
+            componentScores.set(entry.componentId, result.score)
           }
-          setError(UNRECOGNIZED_COMPONENT_MESSAGE)
-          return null
         }
 
-        if (data.code === 'COMPONENT_NOT_RECOGNIZED') {
-          const suggestions = (data.topScores || [])
-            .map((entry) => {
-              const score = typeof entry.score === 'number' ? entry.score : null
-              const component = electronicsComponents.find(
-                (c) => c.id === entry.componentId
-              )
-              return score && component ? `${component.name} (${score}%)` : null
-            })
-            .filter((entry): entry is string => entry !== null)
+        const ranked = [...componentScores.entries()]
+          .map(([componentId, score]) => ({ componentId, score }))
+          .sort((a, b) => b.score - a.score)
+
+        if (ranked.length === 0 || ranked[0].score < 0.03) {
+          const suggestions = ranked
             .slice(0, 2)
+            .map((r) => {
+              const c = electronicsComponents.find((c) => c.id === r.componentId)
+              return c ? `${c.name} (${Math.round(r.score * 100)}%)` : null
+            })
+            .filter((s): s is string => s !== null)
 
-          if (suggestions.length > 0) {
-            setError(`${UNRECOGNIZED_COMPONENT_MESSAGE} Closest: ${suggestions.join(', ')}.`)
-          } else {
-            setError(UNRECOGNIZED_COMPONENT_MESSAGE)
-          }
-          return null
-        }
-
-        if (response.status === 413) {
           setError(
-            'The image is too large to analyze. Please upload a smaller image.'
+            suggestions.length > 0
+              ? `Could not confidently identify the component. Closest: ${suggestions.join(', ')}. Try a closer photo with better lighting.`
+              : 'Could not identify the component. Try a clearer photo with a plain background.'
           )
           return null
         }
 
-        if (data.code === 'MISSING_HF_TOKEN') {
-          setError(SERVICE_UNAVAILABLE_MESSAGE)
-          return null
-        }
-
-        if (data.code === 'IDENTIFICATION_SERVICE_ERROR') {
-          setError(SERVICE_UNAVAILABLE_MESSAGE)
-          return null
-        }
-
-        setError(
-          data.error ||
-            'Could not identify the component. Please try a clearer photo.'
+        const matched = electronicsComponents.find(
+          (c) => c.id === ranked[0].componentId
         )
-        return null
-      } catch (caught) {
-        if (caught instanceof Error && caught.name === 'AbortError') {
-          setError('Identification timed out. Please try again.')
+        if (!matched) {
+          setError('Component not found in database.')
           return null
         }
-        setError('Network error. Check your connection and try again.')
+
+        return {
+          component: matched,
+          confidence: Math.round(ranked[0].score * 100),
+          reasoning: 'Identified locally via in-browser CLIP model',
+        }
+      } catch (err) {
+        console.error('Local classification error:', err)
+        setError('Failed to run classification model. Please try again.')
         return null
       } finally {
-        clearTimeout(timeout)
         setIsAnalyzing(false)
       }
     },
-    []
+    [classify]
   )
 
   const clearError = useCallback(() => setError(null), [])
 
-  return { identify, isAnalyzing, error, clearError }
+  return {
+    identify,
+    isAnalyzing,
+    error,
+    clearError,
+    // Expose model loading state so UI can show progress
+    isModelLoading: isLoading,
+    modelLoadProgress: loadProgress,
+    isClassifying,
+  }
 }
