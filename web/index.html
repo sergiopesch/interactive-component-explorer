@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Electronics Component Explorer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        height: 100%;
+        background: #1a1b26;
+        color: #a9b1d6;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        overflow: hidden;
+      }
+
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      header {
+        padding: 12px 20px;
+        background: #16161e;
+        border-bottom: 1px solid #33467c;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+
+      header h1 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #c0caf5;
+      }
+
+      header .badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: #1a1b2e;
+        border: 1px solid #33467c;
+        color: #7aa2f7;
+      }
+
+      #terminal-container {
+        flex: 1;
+        padding: 8px;
+        min-height: 0;
+      }
+
+      /* Override xterm scrollbar */
+      .xterm-viewport::-webkit-scrollbar {
+        width: 8px;
+      }
+      .xterm-viewport::-webkit-scrollbar-track {
+        background: #1a1b26;
+      }
+      .xterm-viewport::-webkit-scrollbar-thumb {
+        background: #33467c;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Electronics Component Explorer</h1>
+        <span class="badge">WASM / Local AI</span>
+      </header>
+      <div id="terminal-container"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
