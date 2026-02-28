@@ -8,32 +8,68 @@ export default function CapacitorModel() {
   const groupRef = useRef<THREE.Group>(null)
 
   useFrame((_, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += delta * 0.3
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.3
+    }
   })
 
   return (
     <group ref={groupRef}>
-      <mesh position={[0, 0.25, 0]}>
-        <cylinderGeometry args={[0.28, 0.28, 0.95, 28]} />
-        <meshStandardMaterial color="#161c3b" metalness={0.35} roughness={0.55} />
+      {/* Main cylindrical body */}
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.35, 0.35, 1.0, 24]} />
+        <meshStandardMaterial color="#1a1a2e" metalness={0.3} roughness={0.6} />
       </mesh>
 
-      <mesh position={[0, 0.75, 0]}>
-        <cylinderGeometry args={[0.29, 0.29, 0.04, 28]} />
-        <meshStandardMaterial color="#b9bec7" metalness={0.8} roughness={0.25} />
+      {/* Silver top cap */}
+      <mesh position={[0, 0.85, 0]}>
+        <cylinderGeometry args={[0.36, 0.36, 0.05, 24]} />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.7} roughness={0.3} />
       </mesh>
 
-      <mesh position={[0.281, 0.25, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.86, 0.11]} />
-        <meshStandardMaterial color="#d8d9de" side={THREE.DoubleSide} />
+      {/* Top scoring marks (K-shaped pressure vent) */}
+      <mesh position={[0, 0.88, 0]}>
+        <boxGeometry args={[0.5, 0.02, 0.03]} />
+        <meshStandardMaterial color="#888888" metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.88, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <boxGeometry args={[0.5, 0.02, 0.03]} />
+        <meshStandardMaterial color="#888888" metalness={0.5} roughness={0.4} />
       </mesh>
 
-      {[-0.12, 0.12].map((x, i) => (
-        <mesh key={i} position={[x, -0.62 + i * 0.08, 0]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.78 + i * 0.12, 8]} />
-          <meshStandardMaterial color="#b6bbc4" metalness={0.9} roughness={0.2} />
-        </mesh>
-      ))}
+      {/* Negative stripe */}
+      <mesh position={[0.351, 0.3, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <planeGeometry args={[0.9, 0.15]} />
+        <meshStandardMaterial color="#d4d4d4" side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Minus signs on stripe */}
+      <mesh position={[0.355, 0.5, 0]} rotation={[0, 0, 0]}>
+        <boxGeometry args={[0.01, 0.02, 0.08]} />
+        <meshStandardMaterial color="#555555" />
+      </mesh>
+      <mesh position={[0.355, 0.3, 0]} rotation={[0, 0, 0]}>
+        <boxGeometry args={[0.01, 0.02, 0.08]} />
+        <meshStandardMaterial color="#555555" />
+      </mesh>
+
+      {/* Bottom rim */}
+      <mesh position={[0, -0.22, 0]}>
+        <cylinderGeometry args={[0.37, 0.37, 0.04, 24]} />
+        <meshStandardMaterial color="#333333" metalness={0.3} roughness={0.6} />
+      </mesh>
+
+      {/* Positive leg (longer) */}
+      <mesh position={[0.12, -0.7, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.9, 8]} />
+        <meshStandardMaterial color="#aaaaaa" metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      {/* Negative leg (shorter) */}
+      <mesh position={[-0.12, -0.6, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.7, 8]} />
+        <meshStandardMaterial color="#aaaaaa" metalness={0.8} roughness={0.2} />
+      </mesh>
     </group>
   )
 }
