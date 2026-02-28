@@ -2,94 +2,90 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-const TTS_TIMEOUT_MS = 15000
+function getBestVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    return null
+  }
+
+  const voices = window.speechSynthesis.getVoices()
+  if (!voices.length) {
+    return null
+  }
+
+  const englishVoice =
+    voices.find((voice) => voice.lang.toLowerCase().startsWith('en') && /neural|enhanced/i.test(voice.name)) ||
+    voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ||
+    voices[0]
+
+  return englishVoice || null
+}
 
 export function useSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const objectUrlRef = useRef<string | null>(null)
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
-  const cleanupAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current)
-      objectUrlRef.current = null
-    }
+  const stop = useCallback(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
     }
+    utteranceRef.current = null
+    setIsSpeaking(false)
   }, [])
 
-  useEffect(() => cleanupAudio, [cleanupAudio])
-
-  const fallbackToWebSpeech = useCallback((text: string) => {
+  useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setIsSpeaking(false)
       return
     }
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.9
-    utterance.pitch = 1
-    utterance.volume = 1
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
-    window.speechSynthesis.speak(utterance)
-  }, [])
+
+    const hydrateVoices = () => {
+      void getBestVoice()
+    }
+
+    hydrateVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', hydrateVoices)
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', hydrateVoices)
+      stop()
+    }
+  }, [stop])
 
   const speak = useCallback(
     async (text: string) => {
-      cleanupAudio()
-      setIsSpeaking(true)
-
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), TTS_TIMEOUT_MS)
-
-      try {
-        // Try HF TTS API first
-        const res = await fetch('/api/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-          signal: controller.signal,
-        })
-
-        if (!res.ok) throw new Error('TTS API failed')
-
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
-        objectUrlRef.current = url
-
-        const audio = new Audio(url)
-        audioRef.current = audio
-
-        audio.onended = () => {
-          setIsSpeaking(false)
-          cleanupAudio()
-        }
-        audio.onerror = () => {
-          // If audio playback fails, try Web Speech API
-          cleanupAudio()
-          fallbackToWebSpeech(text)
-        }
-
-        await audio.play()
-      } catch {
-        // Fallback to Web Speech API
-        fallbackToWebSpeech(text)
-      } finally {
-        clearTimeout(timeout)
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+        setIsSpeaking(false)
+        return
       }
-    },
-    [cleanupAudio, fallbackToWebSpeech]
-  )
 
-  const stop = useCallback(() => {
-    cleanupAudio()
-    setIsSpeaking(false)
-  }, [cleanupAudio])
+      stop()
+
+      const utterance = new SpeechSynthesisUtterance(text)
+      const voice = getBestVoice()
+
+      if (voice) {
+        utterance.voice = voice
+        utterance.lang = voice.lang
+      } else {
+        utterance.lang = 'en-US'
+      }
+
+      utterance.rate = 0.95
+      utterance.pitch = 1
+      utterance.volume = 1
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => {
+        utteranceRef.current = null
+        setIsSpeaking(false)
+      }
+      utterance.onerror = () => {
+        utteranceRef.current = null
+        setIsSpeaking(false)
+      }
+
+      utteranceRef.current = utterance
+      window.speechSynthesis.speak(utterance)
+    },
+    [stop]
+  )
 
   return { speak, stop, isSpeaking }
 }
