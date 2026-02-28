@@ -1,18 +1,22 @@
-# CLAUDE.md — Agent Instructions for Electronics Explorer
+# CLAUDE.md — Agent Instructions for Electronics Explorer CLI
 
 ## Project Overview
 
-Interactive electronics component explorer built with **Next.js 15**, **Three.js** (via React Three Fiber), **Tailwind CSS**, and **Transformers.js** (in-browser ONNX). Teaches beginners about Arduino Student Kit components through AI-powered photo identification, interactive 3D models, specifications, datasheet details, and AI-generated voice guidance.
+Command-line electronics component explorer built with **Node.js**, **Transformers.js**, and **ONNX Runtime Node**. Identifies Arduino Student Kit components from photos using CLIP, shows specifications and datasheet details, and generates voice descriptions via MMS-TTS saved as WAV files.
 
-**All AI runs in the browser.** No API keys, no server-side routes, no external service calls. CLIP identifies components from photos; MMS-TTS reads descriptions aloud. Model weights are embedded in `public/models/` and served as static files.
+**All AI runs locally.** No API keys, no cloud services, no internet required. CLIP identifies components from photos; MMS-TTS synthesizes voice descriptions. Model weights are embedded in `models/` and loaded from the filesystem.
 
 ## Quick Reference
 
 ```
-npm run dev       # Start dev server (localhost:3000)
-npm run build     # Production build (static export to out/)
-npm run lint      # Run ESLint (zero warnings enforced)
-npx serve out     # Serve the static build locally
+cd cli
+npm install           # Install dependencies
+npx tsx bin/electronics-cli.ts list               # List all components
+npx tsx bin/electronics-cli.ts info resistor       # Show component details
+npx tsx bin/electronics-cli.ts identify photo.jpg  # Identify from photo
+npx tsx bin/electronics-cli.ts speak resistor      # Generate WAV voice file
+npm run build         # Compile TypeScript to dist/
+npm run lint          # Type-check with tsc --noEmit
 ```
 
 No environment variables needed. No `.env` file required.
@@ -20,73 +24,60 @@ No environment variables needed. No `.env` file required.
 ## Architecture
 
 ```
-src/
-├── app/
-│   ├── layout.tsx              # Root layout (only server component), metadata, OG tags
-│   ├── page.tsx                # Home page — renders HomeClient
-│   ├── manifest.ts             # PWA manifest (standalone display)
-│   └── globals.css             # Tailwind directives, animations
-├── components/
-│   ├── Header.tsx              # App header with dark/light mode toggle
-│   ├── HomeClient.tsx          # Main app: camera upload → AI analysis → result + browse grid
-│   ├── ImageUpload.tsx         # Drag & drop / camera capture, resizes to ≤1024px JPEG
-│   ├── ComponentCard.tsx       # Full card: 3D viewer + specs + voice + power + datasheet
-│   ├── ComponentViewer.tsx     # R3F canvas, orbit controls, model router, IntersectionObserver
-│   └── models/
-│       ├── ResistorModel.tsx       # Color-banded resistor
-│       ├── LEDModel.tsx            # { powered } → emissive glow, dome + legs
-│       ├── ButtonModel.tsx         # { powered } → press-down animation, 4 pins
-│       ├── SpeakerModel.tsx        # { powered } → disc vibration
-│       ├── CapacitorModel.tsx      # Electrolytic capacitor
-│       ├── PotentiometerModel.tsx  # Rotary pot with knob
-│       ├── DiodeModel.tsx          # 1N4007 with stripe marking
-│       ├── TransistorModel.tsx     # TO-92 package
-│       └── GenericModel.tsx        # Fallback: routes to Servo, DC Motor, Relay,
-│                                   #   RGB LED, Photoresistor, TempSensor, Ultrasonic, LCD
-├── data/
-│   └── components.ts           # 16 ElectronicsComponent definitions + DatasheetInfo
-└── hooks/
-    ├── useTheme.ts              # { isDark, toggle, mounted } — localStorage + system pref
-    ├── useSpeech.ts             # Drop-in TTS wrapper — delegates to useLocalTTS
-    ├── useLocalTTS.ts           # In-browser MMS-TTS via Transformers.js (sentence streaming)
-    ├── useLocalClassifier.ts    # In-browser CLIP zero-shot via Transformers.js (singleton)
-    └── useComponentIdentifier.ts # Photo → component matching with label mapping + confidence
+cli/
+├── package.json                    # CLI dependencies (transformers, onnxruntime-node, commander, chalk)
+├── tsconfig.json                   # TypeScript config targeting Node.js ES2022
+├── bin/
+│   └── electronics-cli.ts          # Entry point — Commander program with 4 subcommands
+└── src/
+    ├── commands/
+    │   ├── identify.ts             # `identify <image>` — CLIP classification → component match
+    │   ├── speak.ts                # `speak <id>` — MMS-TTS synthesis → WAV file
+    │   ├── list.ts                 # `list` — browse all components by category
+    │   └── info.ts                 # `info <id>` — full specs + datasheet details
+    ├── services/
+    │   ├── classifier.ts           # CLIP pipeline (singleton, loads from models/)
+    │   ├── tts.ts                  # MMS-TTS pipeline (singleton, sentence-by-sentence)
+    │   ├── identifier.ts           # Label mapping, score aggregation, threshold logic
+    │   └── wav.ts                  # Float32 PCM → 16-bit WAV Buffer → file
+    └── utils/
+        └── progress.ts             # Terminal progress bar for model loading
 
-public/
-└── models/
-    └── Xenova/
-        ├── clip-vit-base-patch16/   # CLIP vision + text encoders (146 MB, int8)
-        │   ├── onnx/vision_model_quantized.onnx
-        │   ├── onnx/text_model_quantized.onnx
-        │   ├── config.json, tokenizer.json, preprocessor_config.json, ...
-        └── mms-tts-eng/             # MMS text-to-speech (38 MB, int8)
-            ├── onnx/model_quantized.onnx
-            ├── config.json, tokenizer.json, ...
+data/
+└── components.ts                   # 16 ElectronicsComponent definitions + DatasheetInfo
+
+models/
+└── Xenova/
+    ├── clip-vit-base-patch16/      # CLIP vision + text encoders (146 MB, int8)
+    │   ├── onnx/vision_model_quantized.onnx
+    │   ├── onnx/text_model_quantized.onnx
+    │   ├── config.json, tokenizer.json, preprocessor_config.json, ...
+    └── mms-tts-eng/                # MMS text-to-speech (37 MB, int8)
+        ├── onnx/model_quantized.onnx
+        ├── config.json, tokenizer.json, ...
 ```
 
 ## How to Add a New Component
 
-This is the most common modification. Follow these three steps exactly:
-
-### Step 1 — Add data entry in `src/data/components.ts`
+### Step 1 — Add data entry in `data/components.ts`
 
 Add an object to the `electronicsComponents` array:
 
 ```typescript
 {
-  id: 'capacitor',                            // unique slug, used in ModelSelector switch
-  name: 'Capacitor',                          // display name on card
-  category: 'passive',                        // 'passive' | 'active' | 'input' | 'output'
-  hasActiveState: false,                       // true → shows ON/OFF power toggle button
-  description: 'A capacitor stores...',        // beginner-friendly text shown on card
-  voiceDescription: 'This is a capacitor...',  // text read aloud by AI TTS
+  id: 'capacitor',
+  name: 'Capacitor',
+  category: 'passive',
+  hasActiveState: false,
+  description: 'A capacitor stores...',
+  voiceDescription: 'This is a capacitor...',
   specs: [
     { label: 'Capacitance', value: '100 μF' },
     { label: 'Voltage Rating', value: '25 V' },
   ],
-  circuitExample: 'Connect the capacitor...',  // wiring instructions shown on card
-  clipLabel: 'a photo of a capacitor',         // CLIP label for AI identification
-  datasheetInfo: {                             // optional — enables "Datasheet Details" section
+  circuitExample: 'Connect the capacitor...',
+  clipLabel: 'a photo of a capacitor',
+  datasheetInfo: {
     maxRatings: [{ parameter: 'Voltage', value: '25 V' }],
     pinout: 'Longer lead = positive (anode)...',
     characteristics: [
@@ -98,71 +89,35 @@ Add an object to the `electronicsComponents` array:
 }
 ```
 
-### Step 2 — Create 3D model in `src/components/models/CapacitorModel.tsx`
+### Step 2 — Add extra CLIP labels (optional)
+
+In `cli/src/services/identifier.ts`, add extra label variants to `EXTRA_LABELS` for better classification accuracy:
 
 ```typescript
-'use client'
-
-import { useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
-
-// If hasActiveState: true, accept { powered: boolean }
-// If hasActiveState: false, no props needed
-export default function CapacitorModel() {
-  const groupRef = useRef<THREE.Group>(null)
-
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.3  // standard rotation speed
-    }
-  })
-
-  return (
-    <group ref={groupRef}>
-      {/* Build with Three.js primitives: mesh, boxGeometry, cylinderGeometry, etc. */}
-    </group>
-  )
+const EXTRA_LABELS: Record<string, string[]> = {
+  // ...existing entries...
+  'my-component': ['a photo of an alternate name', 'a photo of another variant'],
 }
 ```
 
-If you skip this step, `GenericModel` (IC chip shape) is used automatically.
-
-### Step 3 — Register in `src/components/ComponentViewer.tsx`
-
-Add import and switch case in the `ModelSelector` function:
-
-```typescript
-import CapacitorModel from './models/CapacitorModel'
-
-// Inside ModelSelector switch:
-case 'capacitor':
-  return <CapacitorModel />
-// Or if active: return <CapacitorModel powered={powered} />
-```
-
-That's it. The grid in `HomeClient.tsx` automatically renders all entries from the data array.
+That's it. The `list`, `info`, `identify`, and `speak` commands automatically pick up new entries from the data array.
 
 ## Key Conventions
 
-- **All components are client-side** (`'use client'`) except `layout.tsx`
-- **ComponentViewer is dynamically imported** with `ssr: false` (Three.js cannot run server-side)
-- **3D camera**: position `[0, 1, 3.5]`, FOV `40`. Orbit controls: rotate only, no zoom/pan
-- **3D lighting**: ambient 0.5 + directional from `[5,5,5]` at 1.0 + fill from `[-3,2,-3]` at 0.3
-- **Rotation speed**: `delta * 0.3` (all models use the same speed)
-- **Animation easing**: `value += (target - value) * delta * N` where N = 4–8
-- **Color palette**: black, white, and grays only in UI chrome. Component models may use realistic colors
-- **Theme**: Tailwind `dark:` prefix. Dark mode via `class` on `<html>`. Stored in `localStorage('theme')`
-- **No global state library** — local React state + hooks only
-- **No external APIs** — all AI runs in-browser via Transformers.js + embedded ONNX models
-- **No environment variables** — the app needs zero configuration to run
-- **Static export** — `output: 'export'` in `next.config.js` produces pure static files in `out/`. No serverless functions (avoids the Vercel 250 MB limit). `next start` is not available; use `npx serve out` to preview locally
-- **WebGL context management** — `ComponentViewer` uses `IntersectionObserver` to lazy-render canvases, staying within browser WebGL context limits
+- **Node.js ES modules** — `"type": "module"` in both root and cli `package.json`
+- **TypeScript strict mode** — `strict: true` in `tsconfig.json`
+- **Singleton pattern** — CLIP and TTS pipelines are loaded once and reused
+- **Model path resolution** — Uses `path.resolve(__dirname, '../../../models')` relative to service files
+- **No external API calls** — All AI runs locally via embedded ONNX models
+- **No environment variables** — Zero configuration needed
+- **WAV output** — TTS generates 16-bit PCM WAV files (not system audio playback)
+- **Commander.js** — CLI framework for argument parsing and subcommands
+- **Chalk** — Terminal colors for formatted output (no colors in `--json` mode)
 
 ## Interface Contracts
 
 ```typescript
-// Data shape — src/data/components.ts
+// Data shape — data/components.ts
 interface ElectronicsComponent {
   id: string
   name: string
@@ -172,8 +127,8 @@ interface ElectronicsComponent {
   voiceDescription: string
   specs: { label: string; value: string }[]
   circuitExample: string
-  clipLabel: string                  // CLIP candidate label for AI identification
-  datasheetInfo?: DatasheetInfo      // optional advanced details
+  clipLabel: string
+  datasheetInfo?: DatasheetInfo
 }
 
 interface DatasheetInfo {
@@ -186,100 +141,88 @@ interface DatasheetInfo {
   tips: string
 }
 
-// Theme hook — src/hooks/useTheme.ts
-useTheme() → { isDark: boolean; toggle: () => void; mounted: boolean }
+// Classifier service — cli/src/services/classifier.ts
+loadClassifier(onProgress?) → Promise<void>
+classify(imagePath, labels) → Promise<ClassifyResult[]>
 
-// Speech hook — src/hooks/useSpeech.ts (wrapper around useLocalTTS)
-useSpeech() → {
-  speak: (text: string) => void
-  stop: () => void
-  isSpeaking: boolean
-  isModelLoading: boolean        // true while TTS model is downloading/initializing
-  modelLoadProgress: number      // 0–100 during model load
-}
+// TTS service — cli/src/services/tts.ts
+loadTTS(onProgress?) → Promise<void>
+synthesizeToFile(text, outputPath, onSentence?) → Promise<{ sampleRate, durationSeconds }>
 
-// Classifier hook — src/hooks/useLocalClassifier.ts
-useLocalClassifier() → {
-  classify: (imageBase64: string, labels: string[]) => Promise<ClassifyResult[]>
-  isLoading: boolean             // true while CLIP model is loading
-  loadProgress: number           // 0–100 during model load
-  isClassifying: boolean         // true during inference
-}
+// Identifier service — cli/src/services/identifier.ts
+identifyComponent(imagePath, threshold?) → Promise<IdentifyResult | null>
+identifyTopN(imagePath, n, threshold?) → Promise<IdentifyResult[]>
 
-// Identifier hook — src/hooks/useComponentIdentifier.ts
-useComponentIdentifier() → {
-  identify: (imageBase64: string) => Promise<IdentifyResult | null>
-  isAnalyzing: boolean
-  error: string | null
-  clearError: () => void
-  isModelLoading: boolean
-  modelLoadProgress: number
-  isClassifying: boolean
-}
-
-// 3D model props (active components only)
-{ powered: boolean }
+// WAV writer — cli/src/services/wav.ts
+float32ToWavBuffer(samples, sampleRate) → Buffer
+saveWav(filePath, samples, sampleRate) → void
 ```
 
 ## AI Pipeline Details
 
 ### Image Classification Flow
-1. `ImageUpload` captures/resizes image → base64 JPEG (≤1024px, ≤1.8MB)
-2. `useComponentIdentifier.identify(base64)` is called
-3. `useLocalClassifier.classify(base64, ALL_CANDIDATE_LABELS)` runs CLIP
+1. `identify <image>` receives a file path
+2. `identifyComponent(imagePath)` is called
+3. `classify(imagePath, ALL_CANDIDATE_LABELS)` runs CLIP via onnxruntime-node
 4. CLIP encodes image + ~30 text labels into vectors, ranks by cosine similarity
-5. Scores aggregated per component (best label wins), ≥3% threshold required
-6. Returns `{ component, confidence, reasoning }` or error
+5. Scores aggregated per component (best label wins), >=3% threshold required
+6. Returns `{ component, confidence, reasoning }` or null
 
 ### TTS Flow
-1. `useSpeech.speak(text)` delegates to `useLocalTTS`
-2. Text split into sentences for progressive playback
+1. `speak <id>` resolves the component's `voiceDescription`
+2. Text is split into sentences for progressive synthesis
 3. MMS-TTS synthesizes each sentence → Float32Array PCM
-4. PCM encoded as WAV blob → played via `<audio>` element
-5. Playback starts after first sentence (no waiting for full text)
+4. All sentence audio is concatenated into a single buffer
+5. PCM is encoded as WAV and written to disk via `fs.writeFileSync()`
 
 ### Model Loading
-- Both models use a **singleton pattern** — loaded once, reused across the app
-- Models load from `/models/` (maps to `public/models/`), configured via:
+- Both models use a **singleton pattern** — loaded once, reused for the process lifetime
+- Models load from `models/Xenova/` (resolved relative to service files), configured via:
   ```typescript
-  env.localModelPath = '/models/'
+  env.localModelPath = path.resolve(__dirname, '../../../models') + '/'
   env.allowLocalModels = true
-  env.allowRemoteModels = false   // zero calls to Hugging Face
+  env.allowRemoteModels = false
   ```
 - Quantized with `dtype: 'q8'` (int8) for smaller size + faster inference
-- Browser caches model files after first load — subsequent visits are instant
+- Uses `onnxruntime-node` (native C++) instead of `onnxruntime-web` (WASM)
 
 ## Common Tasks
 
 | Task | What to do |
 |------|-----------|
-| Add a component | Follow 3-step guide above |
-| Change specs | Edit `specs` array in `src/data/components.ts` |
-| Modify a 3D model | Edit the model file in `src/components/models/` |
-| Change voice text | Edit `voiceDescription` in `src/data/components.ts` |
-| Improve CLIP accuracy | Add label variants to `EXTRA_LABELS` in `useComponentIdentifier.ts` |
-| Change card layout | Edit `src/components/ComponentCard.tsx` |
-| Change browse grid | Edit grid classes in `HomeClient.tsx` |
-| Add a new page/route | Create `src/app/[route]/page.tsx` (Next.js App Router) |
-| Change image upload behavior | Edit `src/components/ImageUpload.tsx` |
-| Edit datasheet details | Edit `datasheetInfo` in `src/data/components.ts` |
-| Update AI models | Replace ONNX files in `public/models/Xenova/` and update hook config |
+| Add a component | Follow 2-step guide above |
+| Change specs | Edit `specs` array in `data/components.ts` |
+| Change voice text | Edit `voiceDescription` in `data/components.ts` |
+| Improve CLIP accuracy | Add label variants to `EXTRA_LABELS` in `cli/src/services/identifier.ts` |
+| Change CLI output format | Edit the command file in `cli/src/commands/` |
+| Edit datasheet details | Edit `datasheetInfo` in `data/components.ts` |
+| Update AI models | Replace ONNX files in `models/Xenova/` and update service config |
+| Add a new command | Create file in `cli/src/commands/`, register in `cli/bin/electronics-cli.ts` |
 
 ## Constraints
 
-- No Google Fonts (build environment may lack network). Use system `font-sans`
-- No color outside black/white palette in UI chrome
-- Keep 3D models simple — primitive geometries only, no external .glb/.gltf files
-- No external API calls — all AI runs in-browser via embedded ONNX models
+- No external API calls — all AI runs locally via embedded ONNX models
 - No environment variables — the app must work with zero configuration
-- No server-side routes — `output: 'export'` means no API routes, no middleware, no SSR
-- Model files in `public/models/` must stay under 100 MB each (GitHub file size limit)
-- Deployable to any static host (Vercel, Netlify, Cloudflare Pages, S3, etc.)
+- Model files in `models/` must stay under 100 MB each (GitHub file size limit)
+- Node.js >= 18.0.0 required
+- Platform support determined by `onnxruntime-node` binaries (Linux x64, macOS arm64/x64, Windows x64)
 
 ## Testing
 
 No test framework is configured yet. If adding tests:
-- Use `vitest` or `jest` with `@testing-library/react`
-- 3D components need `@react-three/test-renderer` or should be tested via integration tests
-- Data module (`components.ts`) can be unit tested directly
-- Hook tests for `useLocalClassifier` and `useLocalTTS` should mock `@huggingface/transformers`
+- Use `vitest` with `tsx` for TypeScript support
+- Data module (`data/components.ts`) can be unit tested directly
+- Service tests for `classifier.ts` and `tts.ts` should mock `@huggingface/transformers`
+- WAV writer (`wav.ts`) can be tested with known PCM inputs
+- Command tests can capture stdout and verify formatted output
+
+## Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `@huggingface/transformers` | Runs CLIP and MMS-TTS pipelines |
+| `onnxruntime-node` | Native ONNX Runtime backend for Node.js |
+| `commander` | CLI argument parsing and subcommands |
+| `chalk` | Terminal colors for formatted output |
+| `tsx` | Run TypeScript directly during development |
+| `typescript` | Type checking and compilation |
