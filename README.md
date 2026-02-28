@@ -1,35 +1,34 @@
-# Electronics Explorer CLI
+# Electronics Explorer
 
-A command-line tool that identifies electronic components from photos and generates voice descriptions using local AI models. Built for the Arduino Student Kit — covers 16 common components with specs, datasheet details, circuit examples, and AI-generated speech.
+Identify electronic components from photos and generate voice descriptions using local AI models. Available as a **Node.js CLI** and a **browser terminal** (xterm.js). Built for the Arduino Student Kit — covers 16 common components with specs, datasheet details, circuit examples, and AI-generated speech.
 
-**No API keys. No cloud services. No internet required.** All AI runs locally via embedded ONNX models.
+**No API keys. No cloud services.** All AI runs locally — via embedded ONNX models on the CLI, or via WebAssembly in the browser.
 
 ## How It Works
 
-1. **Point it at a photo** — Pass an image file of an electronic component
+1. **Point it at a photo** — Pass an image file (CLI) or use the file picker (browser)
 2. **AI identifies it** — A local CLIP vision model classifies the component
 3. **Get details** — See specs, circuit examples, and datasheet information
-4. **Generate speech** — MMS-TTS synthesizes a voice description as a WAV file
+4. **Generate speech** — MMS-TTS synthesizes a voice description (WAV file on CLI, audio playback in browser)
 
 ## Features
 
-- **Local AI identification** — CLIP zero-shot image classification via Transformers.js + ONNX Runtime Node (no server, no API key)
-- **Local AI text-to-speech** — MMS-TTS generates natural speech, saved as WAV files
-- **Self-hosted models** — Quantized ONNX weights bundled in `models/` — zero external calls
+- **Local AI identification** — CLIP zero-shot image classification via Transformers.js (onnxruntime-node on CLI, onnxruntime-web WASM in browser)
+- **Local AI text-to-speech** — MMS-TTS generates natural speech
+- **Two interfaces** — Node.js CLI for scripting, xterm.js browser terminal for interactive use
 - **16 components** — Resistor, LED, push button, piezo speaker, capacitor, potentiometer, diode, transistor, servo motor, DC motor, photoresistor, temperature sensor, ultrasonic sensor, LCD display, relay, RGB LED
 - **Datasheet details** — Max ratings, pin configurations, electrical characteristics, part numbers, pro tips
-- **JSON output** — All commands support `--json` for scripting and piping
+- **JSON output** — CLI commands support `--json` for scripting and piping
+- **Vercel-deployable** — Browser terminal ships as a static site with COOP/COEP headers for SharedArrayBuffer
 
 ## Getting Started
 
-### 1. Install dependencies
+### CLI
 
 ```bash
 cd cli
 npm install
 ```
-
-### 2. Run the CLI
 
 ```bash
 # During development (runs TypeScript directly)
@@ -39,6 +38,16 @@ npx tsx bin/electronics-cli.ts --help
 npm run build
 node dist/cli/bin/electronics-cli.js --help
 ```
+
+### Browser Terminal
+
+```bash
+cd web
+npm install
+npm run dev       # Start dev server at http://localhost:5173
+```
+
+Open the browser and type commands directly in the xterm.js terminal (`list`, `info resistor`, `identify`, `speak led`, etc.). Models download from HuggingFace CDN on first use and are cached by the browser.
 
 ## Commands
 
@@ -85,20 +94,21 @@ npx tsx bin/electronics-cli.ts speak capacitor --text "Custom text to speak"
 
 ## AI Models
 
-All model weights are bundled locally (183 MB total, int8 quantized):
+Both models are int8 quantized (183 MB total) and run via Transformers.js:
 
-| Model | Purpose | Size | Backend |
-|-------|---------|------|---------|
-| CLIP ViT-B/16 | Image classification | 146 MB | onnxruntime-node |
-| MMS-TTS-ENG | Text-to-speech | 37 MB | onnxruntime-node |
+| Model | Purpose | Size | CLI Backend | Web Backend |
+|-------|---------|------|-------------|-------------|
+| CLIP ViT-B/16 | Image classification | 146 MB | onnxruntime-node | onnxruntime-web (WASM) |
+| MMS-TTS-ENG | Text-to-speech | 37 MB | onnxruntime-node | onnxruntime-web (WASM) |
 
-Models are loaded from `models/Xenova/` on first use and cached in memory for subsequent calls. No internet connection required.
+**CLI:** Models load from `models/Xenova/` on the filesystem. No internet required.
+**Web:** Models download from HuggingFace CDN on first use and are cached by the browser.
 
 ## Project Structure
 
 ```
 interactive-component-explorer/
-├── cli/
+├── cli/                                # Node.js CLI application
 │   ├── package.json                    # CLI dependencies
 │   ├── tsconfig.json                   # TypeScript config (Node.js)
 │   ├── bin/
@@ -110,14 +120,33 @@ interactive-component-explorer/
 │       │   ├── list.ts                 # list command
 │       │   └── info.ts                 # info command
 │       ├── services/
-│       │   ├── classifier.ts           # CLIP pipeline
-│       │   ├── tts.ts                  # MMS-TTS pipeline
+│       │   ├── classifier.ts           # CLIP pipeline (onnxruntime-node)
+│       │   ├── tts.ts                  # MMS-TTS pipeline (onnxruntime-node)
 │       │   ├── identifier.ts           # Component matching logic
-│       │   └── wav.ts                  # PCM → WAV file writer
+│       │   └── wav.ts                  # PCM → WAV file (Node Buffer)
 │       └── utils/
 │           └── progress.ts             # Terminal progress bar
+├── web/                                # Browser terminal (xterm.js)
+│   ├── package.json                    # Web dependencies (Vite, xterm, onnxruntime-web)
+│   ├── tsconfig.json                   # TypeScript config (browser)
+│   ├── vite.config.ts                  # Vite build config
+│   ├── vercel.json                     # Vercel static deploy with COOP/COEP headers
+│   ├── index.html                      # Entry HTML
+│   └── src/
+│       ├── main.ts                     # App bootstrap
+│       ├── shell.ts                    # xterm.js shell (history, tab completion, ANSI)
+│       ├── commands/
+│       │   ├── identify.ts             # File picker → CLIP classification
+│       │   ├── speak.ts                # TTS → Web Audio playback + WAV download
+│       │   ├── list.ts                 # List components
+│       │   └── info.ts                 # Show component details
+│       └── services/
+│           ├── classifier.ts           # CLIP pipeline (onnxruntime-web WASM)
+│           ├── tts.ts                  # MMS-TTS pipeline (onnxruntime-web WASM)
+│           ├── identifier.ts           # Component matching logic
+│           └── wav.ts                  # PCM → WAV Blob (browser-native)
 ├── data/
-│   └── components.ts                   # 16 component definitions
+│   └── components.ts                   # 16 component definitions (shared)
 ├── models/
 │   └── Xenova/
 │       ├── clip-vit-base-patch16/      # CLIP (146 MB)
@@ -149,10 +178,31 @@ interactive-component-explorer/
 | LCD Display | Output | `lcd` |
 | RGB LED | Output | `rgb-led` |
 
+## Deploying the Browser Terminal
+
+The `web/` directory deploys as a static site. A `vercel.json` is included for one-click Vercel deployment:
+
+```bash
+cd web
+npm run build     # Outputs to web/dist/
+```
+
+The Vercel config sets `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers, which are required for `SharedArrayBuffer` (used by the multithreaded WASM runtime). If deploying elsewhere, ensure these headers are set:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
 ## System Requirements
 
-- **Node.js** >= 18.0.0
-- **Platforms**: Linux x64, macOS arm64/x64, Windows x64 (determined by `onnxruntime-node` binary compatibility)
+**CLI:**
+- Node.js >= 18.0.0
+- Platforms: Linux x64, macOS arm64/x64, Windows x64 (determined by `onnxruntime-node` binary compatibility)
+
+**Browser terminal:**
+- Any modern browser with WebAssembly support (Chrome, Firefox, Safari, Edge)
+- SharedArrayBuffer support (requires HTTPS or localhost + COOP/COEP headers)
 
 ## License
 
